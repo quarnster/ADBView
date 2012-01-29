@@ -1,0 +1,7 @@
+[
+
+    {
+        "command": "adb_launch",
+        "keys": ["ctrl+d"]
+    }
+]

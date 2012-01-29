@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>name</key>
+    <string>Android Debug Bridge</string>
+    <key>patterns</key>
+    <array>
+        <dict>
+            <key>match</key>
+            <string>^E.*</string>
+            <key>name</key>
+            <string>invalid.adb</string>
+        </dict>
+        <dict>
+            <key>match</key>
+            <string>^W.*</string>
+            <key>name</key>
+            <string>keyword</string>
+        </dict>
+        <dict>
+            <key>match</key>
+            <string>^D.*</string>
+            <key>name</key>
+            <string>comment</string>
+        </dict>
+    </array>
+    <key>scopeName</key>
+    <string>source.adb</string>
+    <key>uuid</key>
+    <string>95F39BAA-EBD3-468A-9965-2C47C3B30C11</string>
+</dict>
+</plist>
