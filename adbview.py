@@ -1,4 +1,27 @@
-import sublime, sublime_plugin
+"""
+Copyright (c) 2012 Fredrik Ehnbom
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+   1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+   2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+   3. This notice may not be removed or altered from any source
+   distribution.
+"""
+import sublime
+import sublime_plugin
 import subprocess
 import Queue
 import threading
@@ -109,6 +132,7 @@ class ADBView(object):
 adb_view = ADBView()
 adb_process = None
 
+
 def output(pipe):
     while True:
         try:
@@ -124,10 +148,13 @@ def output(pipe):
 
 class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
-        print "launch"
         global adb_process
         if adb_process == None or adb_process.poll() != None:
-            adb_process = subprocess.Popen(["adb", "logcat"], shell=False, stdout=subprocess.PIPE)
+            cmd = ["adb", "logcat"]
+            v = self.window.active_view()
+            if not v is None:
+                cmd = v.settings().get("adb_command", ["adb", "logcat"])
+            adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
             adb_view.open()
             t = threading.Thread(target=output, args=(adb_process.stdout,))
             t.start()
@@ -141,4 +168,3 @@ class AdbEventListener(sublime_plugin.EventListener):
         if adb_view.is_open() and view.id() == adb_view.get_view().id():
             adb_view.was_closed()
             adb_process.kill()
-

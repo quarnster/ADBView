@@ -2,6 +2,6 @@
 
     {
         "command": "adb_launch",
-        "keys": ["ctrl+d"]
+        "keys": ["ctrl+alt+d"]
     }
 ]
