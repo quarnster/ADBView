@@ -16,7 +16,7 @@ Please go [[https://github.com/quarnster/ADBView/issues?sort=created&direction=d
     ## If you don't want to use package control, you can manually install it
     ### Go to your packages directory and type:
     ####        git clone https://github.com/quarnster/ADBView ADBView
-    # The default command is ["adb", logcat"]. If you want to change this you can do so via the file setting "adb_command"
+    # The default command is ["adb", "logcat"]. If you want to change this you can do so via the file setting "adb_command"
 
 === Usage ===
 After installation, hit ctrl+alt+d to open up an ADB logcat view.
