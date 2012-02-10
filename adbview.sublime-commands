@@ -1,0 +1,6 @@
+[
+{
+    "caption":"launch adb",
+    "command": "adb_launch"
+}
+]

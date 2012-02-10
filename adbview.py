@@ -129,7 +129,9 @@ class ADBView(object):
                 if self.doScroll:
                     self.view.show(self.view.size())
 
-adb_view = ADBView()
+
+settings = sublime.load_settings(__name__ + ".sublime-settings")
+adb_view = ADBView(s = settings.get("adb_auto_scroll", True))
 adb_process = None
 
 
@@ -150,10 +152,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
         global adb_process
         if adb_process == None or adb_process.poll() != None:
-            cmd = ["adb", "logcat"]
-            v = self.window.active_view()
-            if not v is None:
-                cmd = v.settings().get("adb_command", ["adb", "logcat"])
+            cmd = settings.get("adb_command", ["adb", "logcat"])
             adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
             adb_view.open()
             t = threading.Thread(target=output, args=(adb_process.stdout,))
