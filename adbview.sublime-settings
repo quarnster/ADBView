@@ -1,0 +1,7 @@
+{
+    //ADB command and arguments that should be used.
+    "adb_command": ["adb", "logcat"],
+
+    //Set to false to disable auto scroll of the ADB view
+    "adb_auto_scroll": false
+}
