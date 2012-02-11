@@ -46,7 +46,7 @@ class ADBView(object):
     def is_open(self):
         return not self.closed
 
-    def open(self):
+    def open(self, s=True):
         if self.view == None or self.view.window() == None:
             self.create_view()
 
@@ -130,8 +130,20 @@ class ADBView(object):
                     self.view.show(self.view.size())
 
 
-settings = sublime.load_settings(__name__ + ".sublime-settings")
-adb_view = ADBView(s = settings.get("adb_auto_scroll", True))
+def get_settings():
+    return sublime.load_settings(__name__ + ".sublime-settings")
+
+
+def get_setting(key, default=None):
+    try:
+        s = sublime.active_window().active_view().settings()
+        if s.has(key):
+            return s.get(key)
+    except:
+        pass
+    return get_settings().get(key, default)
+
+adb_view = ADBView(s = get_setting("adb_auto_scroll", True))
 adb_process = None
 
 
@@ -152,9 +164,9 @@ class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
         global adb_process
         if adb_process == None or adb_process.poll() != None:
-            cmd = settings.get("adb_command", ["adb", "logcat"])
+            cmd = get_setting("adb_command", ["adb", "logcat"])
             adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
-            adb_view.open()
+            adb_view.open(s = get_setting("adb_auto_scroll", True))
             t = threading.Thread(target=output, args=(adb_process.stdout,))
             t.start()
 
