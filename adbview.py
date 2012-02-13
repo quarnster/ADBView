@@ -29,6 +29,20 @@ import threading
 import traceback
 
 
+def get_settings():
+    return sublime.load_settings(__name__ + ".sublime-settings")
+
+
+def get_setting(key, default=None):
+    try:
+        s = sublime.active_window().active_view().settings()
+        if s.has(key):
+            return s.get(key)
+    except:
+        pass
+    return get_settings().get(key, default)
+
+
 class ADBView(object):
     LINE = 0
     FOLD_ALL = 1
@@ -43,6 +57,7 @@ class ADBView(object):
         self.doScroll = s
         self.view = None
         self.settingsprefix = settingsprefix
+        self.maxlines = get_setting("adb_maxlines", 20000)
         self.filter = re.compile(".")
 
     def is_open(self):
@@ -103,16 +118,21 @@ class ADBView(object):
     def update(self):
         if not self.is_open():
             return
-        insert = ""
         try:
             while True:
                 cmd, data = self.queue.get_nowait()
                 if cmd == ADBView.LINE:
-                    insert += data
+                    self.view.set_read_only(False)
+                    e = self.view.begin_edit()
+                    row, col = self.view.rowcol(self.view.size())
+                    if row+1 > self.maxlines:
+                        self.view.erase(e, self.view.full_line(0))
+                    self.view.insert(e, self.view.size(), data)
+                    self.view.end_edit(e)
+                    self.view.set_read_only(True)
                 elif cmd == ADBView.FOLD_ALL:
                     self.view.run_command("fold_all")
                 elif cmd == ADBView.CLEAR:
-                    insert = ""
                     self.view.set_read_only(False)
                     e = self.view.begin_edit()
                     self.view.erase(e, sublime.Region(0, self.view.size()))
@@ -129,28 +149,9 @@ class ADBView(object):
         except:
             traceback.print_exc()
         finally:
-            if len(insert) > 0:
-                self.view.set_read_only(False)
-                e = self.view.begin_edit()
-                self.view.insert(e, self.view.size(), insert)
-                self.view.end_edit(e)
-                self.view.set_read_only(True)
-                if self.doScroll:
-                    self.view.show(self.view.size())
+            if self.doScroll:
+                self.view.show(self.view.size())
 
-
-def get_settings():
-    return sublime.load_settings(__name__ + ".sublime-settings")
-
-
-def get_setting(key, default=None):
-    try:
-        s = sublime.active_window().active_view().settings()
-        if s.has(key):
-            return s.get(key)
-    except:
-        pass
-    return get_settings().get(key, default)
 
 adb_view = ADBView(s = get_setting("adb_auto_scroll", True))
 adb_process = None

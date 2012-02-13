@@ -3,5 +3,9 @@
     "adb_command": ["adb", "logcat"],
 
     //Set to false to disable auto scroll of the ADB view
-    "adb_auto_scroll": false
+    "adb_auto_scroll": false,
+
+    // Max number of lines in the adb logcat buffer
+    "adb_maxlines": 20000
+
 }
