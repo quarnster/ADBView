@@ -1,6 +1,11 @@
 [
-{
-    "caption":"launch adb",
-    "command": "adb_launch"
-}
+    {
+        "caption":"ADB: Launch",
+        "command": "adb_launch"
+    },
+    {
+        "caption": "ADB: Set Regex filter",
+        "command": "adb_set_filter"
+    }
+
 ]

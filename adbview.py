@@ -24,6 +24,7 @@ import sublime
 import sublime_plugin
 import subprocess
 import Queue
+import re
 import threading
 import traceback
 
@@ -42,6 +43,7 @@ class ADBView(object):
         self.doScroll = s
         self.view = None
         self.settingsprefix = settingsprefix
+        self.filter = re.compile(".")
 
     def is_open(self):
         return not self.closed
@@ -52,8 +54,9 @@ class ADBView(object):
 
     def add_line(self, line):
         if self.is_open():
-            self.queue.put((ADBView.LINE, line))
-            sublime.set_timeout(self.update, 0)
+            if self.filter.search(line) != None:
+                self.queue.put((ADBView.LINE, line))
+                sublime.set_timeout(self.update, 0)
 
     def scroll(self, line):
         if self.is_open():
@@ -69,6 +72,12 @@ class ADBView(object):
         if self.is_open():
             self.queue.put((ADBView.CLEAR, None))
             sublime.set_timeout(self.update, 0)
+
+    def set_filter(self, filter):
+        try:
+            self.filter = re.compile(filter)
+        except:
+            sublime.error_message("invalid regex")
 
     def create_view(self):
         self.view = sublime.active_window().new_file()
@@ -171,8 +180,19 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             t.start()
 
     def is_enabled(self):
-        return True
+        return not adb_view.is_open()
 
+
+class AdbSetFilter(sublime_plugin.WindowCommand):
+    def set_filter(self, data):
+        adb_view.clear()
+        adb_view.set_filter(data)
+
+    def run(self):
+        self.window.show_input_panel("ADB Regex filter", adb_view.filter.pattern, self.set_filter, None, None)
+
+    def is_enabled(self):
+        return adb_process != None and adb_view.is_open()
 
 class AdbEventListener(sublime_plugin.EventListener):
     def on_close(self, view):
