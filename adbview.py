@@ -58,7 +58,7 @@ class ADBView(object):
         self.view = None
         self.settingsprefix = settingsprefix
         self.maxlines = get_setting("adb_maxlines", 20000)
-        self.filter = re.compile(".")
+        self.filter = re.compile(get_setting("adb_filter", "."))
 
     def is_open(self):
         return not self.closed
