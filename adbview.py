@@ -30,7 +30,7 @@ import traceback
 
 
 def get_settings():
-    return sublime.load_settings(__name__ + ".sublime-settings")
+    return sublime.load_settings("ADBView.sublime-settings")
 
 
 def get_setting(key, default=None):
@@ -50,22 +50,21 @@ class ADBView(object):
     SCROLL = 3
     VIEWPORT_POSITION = 4
 
-    def __init__(self, s=True, settingsprefix=None):
+    def __init__(self):
         self.queue = Queue.Queue()
         self.name = "ADB"
         self.closed = True
-        self.doScroll = s
         self.view = None
-        self.settingsprefix = settingsprefix
-        self.maxlines = get_setting("adb_maxlines", 20000)
-        self.filter = re.compile(get_setting("adb_filter", "."))
 
     def is_open(self):
         return not self.closed
 
-    def open(self, s=True):
+    def open(self):
         if self.view == None or self.view.window() == None:
             self.create_view()
+        self.maxlines = get_setting("adb_maxlines", 20000)
+        self.filter = re.compile(get_setting("adb_filter", "."))
+        self.doScroll = get_setting("adb_auto_scroll", True)
 
     def add_line(self, line):
         if self.is_open():
@@ -153,7 +152,7 @@ class ADBView(object):
                 self.view.show(self.view.size())
 
 
-adb_view = ADBView(s = get_setting("adb_auto_scroll", True))
+adb_view = ADBView()
 adb_process = None
 
 
@@ -176,7 +175,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         if adb_process == None or adb_process.poll() != None:
             cmd = get_setting("adb_command", ["adb", "logcat"])
             adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
-            adb_view.open(s = get_setting("adb_auto_scroll", True))
+            adb_view.open()
             t = threading.Thread(target=output, args=(adb_process.stdout,))
             t.start()
 
@@ -194,6 +193,7 @@ class AdbSetFilter(sublime_plugin.WindowCommand):
 
     def is_enabled(self):
         return adb_process != None and adb_view.is_open()
+
 
 class AdbEventListener(sublime_plugin.EventListener):
     def on_close(self, view):
