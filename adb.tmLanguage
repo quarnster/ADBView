@@ -8,21 +8,101 @@
     <array>
         <dict>
             <key>match</key>
-            <string>^E.*</string>
-            <key>name</key>
-            <string>invalid.adb</string>
+            <string>^(E)\/(.*)\( *(\d+)\): (.*)</string>
+            <key>captures</key>
+            <dict>
+                <key>1</key>
+                <dict>
+                    <key>name</key>
+                    <string>invalid.illegal.adb</string>
+                </dict>
+                <key>2</key>
+                <dict>
+                    <key>name</key>
+                    <string>entity.name.function</string>
+                </dict>
+                <key>3</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb</string>
+                </dict>
+                <key>4</key>
+                <dict>
+                    <key>name</key>
+                    <string>invalid.illegal.adb</string>
+                </dict>
+            </dict>
         </dict>
         <dict>
             <key>match</key>
-            <string>^W.*</string>
-            <key>name</key>
-            <string>keyword</string>
+            <string>^(D)\/(.*)\( *(\d+)\): (.*)</string>
+            <key>captures</key>
+            <dict>
+                <key>1</key>
+                <dict>
+                    <key>name</key>
+                    <string>comment.adb</string>
+                </dict>
+                <key>2</key>
+                <dict>
+                    <key>name</key>
+                    <string>entity.name.function</string>
+                </dict>
+                <key>3</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb</string>
+                </dict>
+                <key>4</key>
+                <dict>
+                    <key>name</key>
+                    <string>comment.adb</string>
+                </dict>
+            </dict>
         </dict>
         <dict>
             <key>match</key>
-            <string>^D.*</string>
-            <key>name</key>
-            <string>comment</string>
+            <string>^(W)\/(.*)\( *(\d+)\): (.*)</string>
+            <key>captures</key>
+            <dict>
+                <key>1</key>
+                <dict>
+                    <key>name</key>
+                    <string>keyword.adb</string>
+                </dict>
+                <key>2</key>
+                <dict>
+                    <key>name</key>
+                    <string>entity.name.function</string>
+                </dict>
+                <key>3</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb</string>
+                </dict>
+                <key>4</key>
+                <dict>
+                    <key>name</key>
+                    <string>keyword.adb</string>
+                </dict>
+            </dict>
+        </dict>
+        <dict>
+            <key>match</key>
+            <string>^(.)\/(.*)\( *(\d+)\): (.*)</string>
+            <key>captures</key>
+            <dict>
+                <key>2</key>
+                <dict>
+                    <key>name</key>
+                    <string>entity.name.function</string>
+                </dict>
+                <key>3</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb</string>
+                </dict>
+            </dict>
         </dict>
     </array>
     <key>scopeName</key>
