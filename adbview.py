@@ -90,6 +90,7 @@ class ADBView(object):
     def set_filter(self, filter):
         try:
             self.filter = re.compile(filter)
+            self.apply_filter()
         except:
             sublime.error_message("invalid regex")
 
@@ -136,7 +137,7 @@ class ADBView(object):
         try:
             while True:
                 cmd, data = self.queue.get_nowait()
-                if cmd == ADBView.LINE:
+                if cmd == ADBView.LINE and self.filter.search(data) != None:
                     self.view.set_read_only(False)
                     e = self.view.begin_edit()
                     row, col = self.view.rowcol(self.view.size())
@@ -185,6 +186,48 @@ def output(pipe):
             traceback.print_exc()
 
 
+class AdbFilterByProcessId(sublime_plugin.TextCommand):
+    def run(self, edit):
+        data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
+        match = re.match("./.+\( *(\d+)\)", data)
+        if match != None:
+            adb_view.set_filter("\( *%s\)" % match.group(1))
+
+    def is_enabled(self):
+        return adb_view.is_open() and adb_view.get_view().id() == self.view.id()
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
+class AdbFilterByProcessName(sublime_plugin.TextCommand):
+    def run(self, edit):
+        data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
+        match = re.match("./(.+)\( *\d+\)", data)
+        if match != None:
+            adb_view.set_filter("%s\( *\d+\)" % match.group(1))
+
+    def is_enabled(self):
+        return adb_view.is_open() and adb_view.get_view().id() == self.view.id()
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
+class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
+    def run(self, edit):
+        data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
+        match = re.match("(\w)/.+\( *\d+\)", data)
+        if match != None:
+            adb_view.set_filter("%s/.+\( *\d+\)" % match.group(1))
+
+    def is_enabled(self):
+        return adb_view.is_open() and adb_view.get_view().id() == self.view.id()
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
 class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
         global adb_process
@@ -202,13 +245,15 @@ class AdbLaunch(sublime_plugin.WindowCommand):
 class AdbSetFilter(sublime_plugin.WindowCommand):
     def set_filter(self, data):
         adb_view.set_filter(data)
-        adb_view.apply_filter()
 
     def run(self):
         self.window.show_input_panel("ADB Regex filter", adb_view.filter.pattern, self.set_filter, None, None)
 
     def is_enabled(self):
         return adb_process != None and adb_view.is_open()
+
+    def is_visible(self):
+        return self.is_enabled()
 
 
 class AdbEventListener(sublime_plugin.EventListener):
