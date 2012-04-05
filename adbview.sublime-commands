@@ -6,6 +6,10 @@
     {
         "caption": "ADB: Set Regex filter",
         "command": "adb_set_filter"
+    },
+    {
+        "caption": "ADB: Clear View",
+        "command": "adb_clear_view"
     }
 
 ]

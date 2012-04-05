@@ -256,6 +256,17 @@ class AdbSetFilter(sublime_plugin.WindowCommand):
         return self.is_enabled()
 
 
+class AdbClearView(sublime_plugin.WindowCommand):
+    def run(self):
+        adb_view.clear()
+
+    def is_enabled(self):
+        return adb_process != None and adb_view.is_open()
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
 class AdbEventListener(sublime_plugin.EventListener):
     def on_close(self, view):
         if adb_view.is_open() and view.id() == adb_view.get_view().id():
