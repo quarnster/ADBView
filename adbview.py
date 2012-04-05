@@ -93,6 +93,22 @@ class ADBView(object):
         except:
             sublime.error_message("invalid regex")
 
+    def apply_filter(self):
+        endline, endcol = self.view.rowcol(self.view.size())
+        line = 0
+        self.view.set_read_only(False)
+        e = self.view.begin_edit()
+        while line < endline:
+            region = self.view.full_line(self.view.text_point(line, 0))
+            data = self.view.substr(region)
+            if self.filter.search(data) == None:
+                self.view.erase(e, region)
+                endline -= 1
+                line -= 1
+            line += 1
+        self.view.end_edit(e)
+        self.view.set_read_only(True)
+
     def create_view(self):
         self.view = sublime.active_window().new_file()
         self.view.set_name(self.name)
@@ -185,8 +201,8 @@ class AdbLaunch(sublime_plugin.WindowCommand):
 
 class AdbSetFilter(sublime_plugin.WindowCommand):
     def set_filter(self, data):
-        adb_view.clear()
         adb_view.set_filter(data)
+        adb_view.apply_filter()
 
     def run(self):
         self.window.show_input_panel("ADB Regex filter", adb_view.filter.pattern, self.set_filter, None, None)
