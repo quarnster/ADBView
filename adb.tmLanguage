@@ -8,25 +8,30 @@
     <array>
         <dict>
             <key>match</key>
-            <string>^(E)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^([\d\- :.]*)(E)\/(.*)\( *(\d+)\): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb.timestamp</string>
+                </dict>
+                <key>2</key>
                 <dict>
                     <key>name</key>
                     <string>invalid.illegal.adb</string>
                 </dict>
-                <key>2</key>
+                <key>3</key>
                 <dict>
                     <key>name</key>
                     <string>entity.name.function</string>
                 </dict>
-                <key>3</key>
+                <key>4</key>
                 <dict>
                     <key>name</key>
                     <string>constant.other.adb</string>
                 </dict>
-                <key>4</key>
+                <key>5</key>
                 <dict>
                     <key>name</key>
                     <string>invalid.illegal.adb</string>
@@ -35,25 +40,30 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^(D)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^([\d\- :.]*)(D)\/(.*)\( *(\d+)\): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
                 <dict>
                     <key>name</key>
-                    <string>comment.adb</string>
+                    <string>constant.other.adb.timestamp</string>
                 </dict>
                 <key>2</key>
                 <dict>
                     <key>name</key>
-                    <string>entity.name.function</string>
+                    <string>comment.adb</string>
                 </dict>
                 <key>3</key>
                 <dict>
                     <key>name</key>
-                    <string>constant.other.adb</string>
+                    <string>entity.name.function</string>
                 </dict>
                 <key>4</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb</string>
+                </dict>
+                <key>5</key>
                 <dict>
                     <key>name</key>
                     <string>comment.adb</string>
@@ -62,25 +72,30 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^(W)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^([\d\- :.]*)(W)\/(.*)\( *(\d+)\): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
                 <dict>
                     <key>name</key>
-                    <string>keyword.adb</string>
+                    <string>constant.other.adb.timestamp</string>
                 </dict>
                 <key>2</key>
                 <dict>
                     <key>name</key>
-                    <string>entity.name.function</string>
+                    <string>keyword.adb</string>
                 </dict>
                 <key>3</key>
                 <dict>
                     <key>name</key>
-                    <string>constant.other.adb</string>
+                    <string>entity.name.function</string>
                 </dict>
                 <key>4</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb</string>
+                </dict>
+                <key>5</key>
                 <dict>
                     <key>name</key>
                     <string>keyword.adb</string>
@@ -89,15 +104,20 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^(.)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^([\d\- :.]*)(.)\/(.*)\( *(\d+)\): (.*)</string>
             <key>captures</key>
             <dict>
-                <key>2</key>
+                <key>1</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb.timestamp</string>
+                </dict>
+                <key>3</key>
                 <dict>
                     <key>name</key>
                     <string>entity.name.function</string>
                 </dict>
-                <key>3</key>
+                <key>4</key>
                 <dict>
                     <key>name</key>
                     <string>constant.other.adb</string>
