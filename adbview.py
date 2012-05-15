@@ -68,9 +68,8 @@ class ADBView(object):
 
     def add_line(self, line):
         if self.is_open():
-            if self.filter.search(line) != None:
-                self.queue.put((ADBView.LINE, line))
-                sublime.set_timeout(self.update, 0)
+            self.queue.put((ADBView.LINE, line))
+            sublime.set_timeout(self.update, 0)
 
     def scroll(self, line):
         if self.is_open():
@@ -90,25 +89,36 @@ class ADBView(object):
     def set_filter(self, filter):
         try:
             self.filter = re.compile(filter)
-            self.apply_filter()
+            if self.is_open():
+                self.apply_filter(self.view)
+            else:
+                self.apply_filter(sublime.active_window().active_view())
         except:
             sublime.error_message("invalid regex")
 
-    def apply_filter(self):
-        endline, endcol = self.view.rowcol(self.view.size())
-        line = 0
-        self.view.set_read_only(False)
-        e = self.view.begin_edit()
-        while line < endline:
-            region = self.view.full_line(self.view.text_point(line, 0))
-            data = self.view.substr(region)
-            if self.filter.search(data) == None:
-                self.view.erase(e, region)
-                endline -= 1
-                line -= 1
-            line += 1
-        self.view.end_edit(e)
-        self.view.set_read_only(True)
+    def apply_filter(self, view):
+        if is_adb_syntax(view):
+            view.run_command("unfold_all")
+            endline, endcol = view.rowcol(view.size())
+            line = 0
+            currRegion = None
+            regions = []
+            while line < endline:
+                region = view.full_line(view.text_point(line, 0))
+                data = view.substr(region)
+                if self.filter.search(data) == None:
+                    if currRegion == None:
+                        currRegion = region
+                    else:
+                        currRegion = currRegion.cover(region)
+                else:
+                    if currRegion:
+                        regions.append(currRegion)
+                        currRegion = None
+                line += 1
+            if currRegion:
+                regions.append(currRegion)
+            view.fold(regions)
 
     def create_view(self):
         self.view = sublime.active_window().new_file()
@@ -137,7 +147,7 @@ class ADBView(object):
         try:
             while True:
                 cmd, data = self.queue.get_nowait()
-                if cmd == ADBView.LINE and self.filter.search(data) != None:
+                if cmd == ADBView.LINE:
                     self.view.set_read_only(False)
                     e = self.view.begin_edit()
                     row, col = self.view.rowcol(self.view.size())
@@ -146,6 +156,8 @@ class ADBView(object):
                     self.view.insert(e, self.view.size(), data)
                     self.view.end_edit(e)
                     self.view.set_read_only(True)
+                    if self.filter.search(data) == None:
+                        self.view.fold(self.view.line(self.view.size()-1))
                 elif cmd == ADBView.FOLD_ALL:
                     self.view.run_command("fold_all")
                 elif cmd == ADBView.CLEAR:
@@ -186,6 +198,11 @@ def output(pipe):
             traceback.print_exc()
 
 
+def is_adb_syntax(view):
+    sn = view.scope_name(view.sel()[0].a)
+    return sn.startswith("source.adb")
+
+
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
@@ -194,7 +211,7 @@ class AdbFilterByProcessId(sublime_plugin.TextCommand):
             adb_view.set_filter("\( *%s\)" % match.group(1))
 
     def is_enabled(self):
-        return adb_view.is_open() and adb_view.get_view().id() == self.view.id()
+        return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
 
     def is_visible(self):
         return self.is_enabled()
@@ -208,7 +225,7 @@ class AdbFilterByProcessName(sublime_plugin.TextCommand):
             adb_view.set_filter("%s\( *\d+\)" % match.group(1))
 
     def is_enabled(self):
-        return adb_view.is_open() and adb_view.get_view().id() == self.view.id()
+        return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
 
     def is_visible(self):
         return self.is_enabled()
@@ -222,7 +239,7 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
             adb_view.set_filter("%s/.+\( *\d+\)" % match.group(1))
 
     def is_enabled(self):
-        return adb_view.is_open() and adb_view.get_view().id() == self.view.id()
+        return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
 
     def is_visible(self):
         return self.is_enabled()
@@ -250,7 +267,7 @@ class AdbSetFilter(sublime_plugin.WindowCommand):
         self.window.show_input_panel("ADB Regex filter", adb_view.filter.pattern, self.set_filter, None, None)
 
     def is_enabled(self):
-        return adb_process != None and adb_view.is_open()
+        return is_adb_syntax(sublime.active_window().active_view()) or (adb_process != None and adb_view.is_open())
 
     def is_visible(self):
         return self.is_enabled()
