@@ -215,9 +215,11 @@ def is_adb_syntax(view):
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match("./.+\( *(\d+)\)", data)
+        match = re.match(r"[\-\d\s:.]*./.+\( *(\d+)\)", data)
         if match != None:
             adb_view.set_filter("\( *%s\)" % match.group(1))
+        else:
+            sublime.error_message("Couldn't extract process id")
 
     def is_enabled(self):
         return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
@@ -229,9 +231,11 @@ class AdbFilterByProcessId(sublime_plugin.TextCommand):
 class AdbFilterByProcessName(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match("./(.+)\( *\d+\)", data)
+        match = re.match(r"[\-\d\s:.]*./(.+)\( *\d+\)", data)
         if match != None:
             adb_view.set_filter("%s\( *\d+\)" % match.group(1))
+        else:
+            sublime.error_message("Couldn't extract process name")
 
     def is_enabled(self):
         return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
@@ -243,9 +247,11 @@ class AdbFilterByProcessName(sublime_plugin.TextCommand):
 class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match("(\w)/.+\( *\d+\)", data)
+        match = re.match(r"[\-\d\s:.]*(\w)/.+\( *\d+\)", data)
         if match != None:
             adb_view.set_filter("%s/.+\( *\d+\)" % match.group(1))
+        else:
+            sublime.error_message("Couldn't extract Message level")
 
     def is_enabled(self):
         return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
@@ -259,6 +265,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         global adb_process
         if adb_process == None or adb_process.poll() != None:
             cmd = get_setting("adb_command", ["adb", "logcat"])
+            print "running: %s" % cmd
             adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
             adb_view.open()
             t = threading.Thread(target=output, args=(adb_process.stdout,))
