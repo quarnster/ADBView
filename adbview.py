@@ -55,6 +55,7 @@ class ADBView(object):
         self.name = "ADB"
         self.closed = True
         self.view = None
+        self.last_fold = None
 
     def is_open(self):
         return not self.closed
@@ -157,7 +158,15 @@ class ADBView(object):
                     self.view.end_edit(e)
                     self.view.set_read_only(True)
                     if self.filter.search(data) == None:
-                        self.view.fold(self.view.line(self.view.size()-1))
+                        region = self.view.line(self.view.size()-1)
+                        if self.last_fold != None:
+                            self.view.unfold(self.last_fold)
+                            self.last_fold = self.last_fold.cover(region)
+                        else:
+                            self.last_fold = region
+                        self.view.fold(self.last_fold)
+                    else:
+                        self.last_fold = None
                 elif cmd == ADBView.FOLD_ALL:
                     self.view.run_command("fold_all")
                 elif cmd == ADBView.CLEAR:
