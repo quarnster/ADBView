@@ -90,10 +90,7 @@ class ADBView(object):
     def set_filter(self, filter):
         try:
             self.filter = re.compile(filter)
-            if self.is_open():
-                self.apply_filter(self.view)
-            else:
-                self.apply_filter(sublime.active_window().active_view())
+            self.apply_filter(sublime.active_window().active_view())
         except:
             sublime.error_message("invalid regex")
 
