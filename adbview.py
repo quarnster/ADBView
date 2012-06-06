@@ -260,16 +260,17 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
 class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
         global adb_process
-        if adb_process == None or adb_process.poll() != None:
-            cmd = get_setting("adb_command", ["adb", "logcat"])
-            print "running: %s" % cmd
-            adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
-            adb_view.open()
-            t = threading.Thread(target=output, args=(adb_process.stdout,))
-            t.start()
+        if adb_process != None and adb_process.poll() == None:
+            adb_process.kill()
+        cmd = get_setting("adb_command", ["adb", "logcat"])
+        print "running: %s" % cmd
+        adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+        adb_view.open()
+        t = threading.Thread(target=output, args=(adb_process.stdout,))
+        t.start()
 
     def is_enabled(self):
-        return not adb_view.is_open()
+        return not (adb_view.is_open() and adb_view.view.window() != None)
 
 
 class AdbSetFilter(sublime_plugin.WindowCommand):
