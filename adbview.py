@@ -111,6 +111,10 @@ class ADBView(object):
                         currRegion = currRegion.cover(region)
                 else:
                     if currRegion:
+                        # The -1 is to not include the \n and thus making the fold ... appear
+                        # at the end of the last line in the fold, rather than at the
+                        # beginning of the "accepted" line
+                        currRegion = sublime.Region(currRegion.begin()-1, currRegion.end()-1)
                         regions.append(currRegion)
                         currRegion = None
                 line += 1
@@ -161,7 +165,8 @@ class ADBView(object):
                             self.last_fold = self.last_fold.cover(region)
                         else:
                             self.last_fold = region
-                        self.view.fold(self.last_fold)
+                        foldregion = sublime.Region(self.last_fold.begin()-1, self.last_fold.end())
+                        self.view.fold(foldregion)
                     else:
                         self.last_fold = None
                 elif cmd == ADBView.FOLD_ALL:
