@@ -56,6 +56,9 @@ class ADBView(object):
         self.closed = True
         self.view = None
         self.last_fold = None
+        self.timer = None
+        self.lines = ""
+        self.lock = threading.RLock()
 
     def is_open(self):
         return not self.closed
@@ -67,10 +70,32 @@ class ADBView(object):
         self.filter = re.compile(get_setting("adb_filter", "."))
         self.doScroll = get_setting("adb_auto_scroll", True)
 
-    def add_line(self, line):
-        if self.is_open():
+
+    def timed_add(self):
+        try:
+            self.lock.acquire()
+            line = self.lines
+            self.lines = ""
+            self.timer = None
             self.queue.put((ADBView.LINE, line))
             sublime.set_timeout(self.update, 0)
+        finally:
+            self.lock.release()
+
+    def add_line(self, line):
+        if self.is_open():
+            try:
+                self.lock.acquire()
+                self.lines += line
+                if self.timer:
+                    self.timer.cancel()
+                if self.lines.count("\n") > 10:
+                    self.timed_add()
+                else:
+                    self.timer = threading.Timer(0.1, self.timed_add)
+                    self.timer.start()
+            finally:
+                self.lock.release()
 
     def scroll(self, line):
         if self.is_open():
