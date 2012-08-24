@@ -115,7 +115,7 @@ class ADBView(object):
     def set_filter(self, filter):
         try:
             self.filter = re.compile(filter)
-            self.apply_filter(sublime.active_window().active_view())
+            self.apply_filter(self.view)
         except:
             sublime.error_message("invalid regex")
 
@@ -146,6 +146,7 @@ class ADBView(object):
             if currRegion:
                 regions.append(currRegion)
             view.fold(regions)
+            self.last_fold = currRegion
 
     def create_view(self):
         self.view = sublime.active_window().new_file()
@@ -175,25 +176,31 @@ class ADBView(object):
             while True:
                 cmd, data = self.queue.get_nowait()
                 if cmd == ADBView.LINE:
-                    self.view.set_read_only(False)
-                    e = self.view.begin_edit()
-                    row, col = self.view.rowcol(self.view.size())
-                    if row+1 > self.maxlines:
-                        self.view.erase(e, self.view.full_line(0))
-                    self.view.insert(e, self.view.size(), data)
-                    self.view.end_edit(e)
-                    self.view.set_read_only(True)
-                    if self.filter.search(data) == None:
-                        region = self.view.line(self.view.size()-1)
-                        if self.last_fold != None:
-                            self.view.unfold(self.last_fold)
-                            self.last_fold = self.last_fold.cover(region)
+                    for line in data.split("\n"):
+                        if len(line.strip()) == 0:
+                            continue
+                        line += "\n"
+                        row, col = self.view.rowcol(self.view.size())
+                        e = self.view.begin_edit()
+                        self.view.set_read_only(False)
+
+                        if row+1 > self.maxlines:
+                            self.view.erase(e, self.view.full_line(0))
+                        self.view.insert(e, self.view.size(), line)
+                        self.view.end_edit(e)
+                        self.view.set_read_only(True)
+
+                        if self.filter.search(line) == None:
+                            region = self.view.line(self.view.size()-1)
+                            if self.last_fold != None:
+                                self.view.unfold(self.last_fold)
+                                self.last_fold = self.last_fold.cover(region)
+                            else:
+                                self.last_fold = region
+                            foldregion = sublime.Region(self.last_fold.begin()-1, self.last_fold.end())
+                            self.view.fold(foldregion)
                         else:
-                            self.last_fold = region
-                        foldregion = sublime.Region(self.last_fold.begin()-1, self.last_fold.end())
-                        self.view.fold(foldregion)
-                    else:
-                        self.last_fold = None
+                            self.last_fold = None
                 elif cmd == ADBView.FOLD_ALL:
                     self.view.run_command("fold_all")
                 elif cmd == ADBView.CLEAR:
