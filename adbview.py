@@ -242,6 +242,8 @@ def output(pipe):
 
 
 def is_adb_syntax(view):
+    if not view:
+        return False
     sn = view.scope_name(view.sel()[0].a)
     return sn.startswith("source.adb")
 
