@@ -59,6 +59,9 @@ class ADBView(object):
         self.timer = None
         self.lines = ""
         self.lock = threading.RLock()
+        self.maxlines = get_setting("adb_maxlines", 20000)
+        self.filter = re.compile(get_setting("adb_filter", "."))
+        self.doScroll = get_setting("adb_auto_scroll", True)
 
     def is_open(self):
         return not self.closed
@@ -66,10 +69,6 @@ class ADBView(object):
     def open(self):
         if self.view == None or self.view.window() == None:
             self.create_view()
-        self.maxlines = get_setting("adb_maxlines", 20000)
-        self.filter = re.compile(get_setting("adb_filter", "."))
-        self.doScroll = get_setting("adb_auto_scroll", True)
-
 
     def timed_add(self):
         try:
@@ -112,11 +111,15 @@ class ADBView(object):
             self.queue.put((ADBView.CLEAR, None))
             sublime.set_timeout(self.update, 0)
 
-    def set_filter(self, filter):
+    def set_filter(self, filter, extra_view=None):
         try:
             self.filter = re.compile(filter)
-            self.apply_filter(self.view)
+            if extra_view:
+                self.apply_filter(extra_view)
+            if self.view:
+                self.apply_filter(self.view)
         except:
+            traceback.print_exc()
             sublime.error_message("invalid regex")
 
     def apply_filter(self, view):
@@ -146,7 +149,8 @@ class ADBView(object):
             if currRegion:
                 regions.append(currRegion)
             view.fold(regions)
-            self.last_fold = currRegion
+            if self.view and view.id() == self.view.id():
+                self.last_fold = currRegion
 
     def create_view(self):
         self.view = sublime.active_window().new_file()
@@ -251,7 +255,7 @@ class AdbFilterByProcessId(sublime_plugin.TextCommand):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
         match = re.match(r"[\-\d\s:.]*./.+\( *(\d+)\)", data)
         if match != None:
-            adb_view.set_filter("\( *%s\)" % match.group(1))
+            adb_view.set_filter("\( *%s\)" % match.group(1), self.view)
         else:
             sublime.error_message("Couldn't extract process id")
 
@@ -267,7 +271,7 @@ class AdbFilterByProcessName(sublime_plugin.TextCommand):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
         match = re.match(r"[\-\d\s:.]*./(.+)\( *\d+\)", data)
         if match != None:
-            adb_view.set_filter("%s\( *\d+\)" % match.group(1))
+            adb_view.set_filter("%s\( *\d+\)" % match.group(1), self.view)
         else:
             sublime.error_message("Couldn't extract process name")
 
@@ -283,7 +287,7 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
         match = re.match(r"[\-\d\s:.]*(\w)/.+\( *\d+\)", data)
         if match != None:
-            adb_view.set_filter("%s/.+\( *\d+\)" % match.group(1))
+            adb_view.set_filter("%s/.+\( *\d+\)" % match.group(1), self.view)
         else:
             sublime.error_message("Couldn't extract Message level")
 
@@ -312,7 +316,11 @@ class AdbLaunch(sublime_plugin.WindowCommand):
 
 class AdbSetFilter(sublime_plugin.WindowCommand):
     def set_filter(self, data):
-        adb_view.set_filter(data)
+        extra_view = None
+        w = sublime.active_window()
+        if w:
+            extra_view = w.active_view()
+        adb_view.set_filter(data, extra_view)
 
     def run(self):
         self.window.show_input_panel("ADB Regex filter", adb_view.filter.pattern, self.set_filter, None, None)
