@@ -27,6 +27,7 @@ import Queue
 import re
 import threading
 import traceback
+import telnetlib
 
 
 def get_settings():
@@ -302,10 +303,56 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
 
 class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
+        adb = get_setting("adb_command", "adb")
+        cmd = [adb, "devices"]
+        proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+        out = proc.stdout.read()
+        # get list of device ids
+        self.devices = []
+        for line in out.split("\n"):
+            line = line.strip()
+            if line not in ["", "List of devices attached"]:
+                self.devices.append(re.sub(r"[ \t]*device$", "", line))
+        # build quick menu options displaying name, version, and device id
+        options = []
+        for device in self.devices:
+            # dump build.prop
+            cmd = [adb, "-s", device, "shell", "cat /system/build.prop"]
+            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            build_prop = proc.stdout.read().strip()
+            # get name
+            product = "Unknown"  # should never actually see this
+            if device.startswith("emulator"):
+                port = device.rsplit("-")[-1]
+                t = telnetlib.Telnet("localhost", port)
+                t.read_until("OK", 1000)
+                t.write("avd name\n")
+                product = t.read_until("OK", 1000)
+                t.close()
+                product = product.replace("OK", "").strip()
+            else:
+                product = re.findall(r"^ro\.product\.model=(.*)$", build_prop, re.MULTILINE)
+                if product:
+                    product = product[0]
+            # get version
+            version = re.findall(r"ro\.build\.version\.release=(.*)$", build_prop, re.MULTILINE)
+            if version:
+                version = version[0]
+            else:
+                version = "x.x.x"
+            options.append("%s %s - %s" % (product, version, device))
+        self.window.show_quick_panel(options, self.on_done)
+
+    def on_done(self, picked):
+        if picked == -1:
+            return
+        device = self.devices[picked]
         global adb_process
         if adb_process != None and adb_process.poll() == None:
             adb_process.kill()
-        cmd = get_setting("adb_command", ["adb", "logcat"])
+        adb = get_setting("adb_command", "adb")
+        args = get_setting("adb_args", ["logcat"])
+        cmd = [adb, "-s", device] + args
         print "running: %s" % cmd
         adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
         adb_view.open()
