@@ -34,14 +34,47 @@ def get_settings():
     return sublime.load_settings("ADBView.sublime-settings")
 
 
-def get_setting(key, default=None):
+def get_setting(key, default=None, view=None, raw=False):
+    def myret(key, value):
+        if raw:
+            return value
+        if key == "adb_command" and type(value) == list:
+            args = value[1:]
+            value = value[0]
+            msg = """The adb_command setting was changed from a list to a string, with the arguments in the separate setting \"adb_args\". \
+ The setting for this view has been automatically converted, but you'll need to change the source of this setting for it to persist. The automatic conversion is now using these settings:
+
+ "adb_command": "%s",
+ "adb_args": %s,
+
+ (Hint, this message is also printed in the python console for easy copy'n'paste)""" % (value, args)
+            show = True
+            try:
+                show = not view.settings().get("adb_has_shown_message", False)
+                view.settings().set("adb_has_shown_message", True)
+            except:
+                pass
+
+            if show:
+                sublime.message_dialog(msg)
+        elif key == "adb_args" and value == None:
+            cmd = get_setting("adb_command", view, True)
+            if type(cmd) == list:
+                value = cmd[1:]
+            else:
+                value = default
+        return value
+
     try:
-        s = sublime.active_window().active_view().settings()
+        if view == None:
+            view = sublime.active_window().active_view()
+        s = view.settings()
         if s.has(key):
-            return s.get(key)
+            return myret(key, s.get(key))
     except:
+        traceback.print_exc()
         pass
-    return get_settings().get(key, default)
+    return myret(key, get_settings().get(key))
 
 
 class ADBView(object):
@@ -305,8 +338,12 @@ class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
         adb = get_setting("adb_command", "adb")
         cmd = [adb, "devices"]
-        proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
-        out = proc.stdout.read()
+        try:
+            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            out,err = proc.communicate()
+        except:
+            sublime.error_message("Error trying to launch ADB:\n\n%s\n\n%s" % (cmd, traceback.format_exc()))
+            return
         # get list of device ids
         self.devices = []
         for line in out.split("\n"):
@@ -341,23 +378,33 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             else:
                 version = "x.x.x"
             options.append("%s %s - %s" % (product, version, device))
-        self.window.show_quick_panel(options, self.on_done)
+        if len(options) == 0:
+            sublime.status_message("ADB: No device attached!")
+        elif len(options) == 1:
+            adb = get_setting("adb_command", "adb")
+            args = get_setting("adb_args", ["logcat"])
+            self.launch([adb] + args)
+        else:
+            self.window.show_quick_panel(options, self.on_done)
 
-    def on_done(self, picked):
-        if picked == -1:
-            return
-        device = self.devices[picked]
+    def launch(self, cmd):
         global adb_process
         if adb_process != None and adb_process.poll() == None:
             adb_process.kill()
-        adb = get_setting("adb_command", "adb")
-        args = get_setting("adb_args", ["logcat"])
-        cmd = [adb, "-s", device] + args
         print "running: %s" % cmd
         adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
         adb_view.open()
         t = threading.Thread(target=output, args=(adb_process.stdout,))
         t.start()
+
+    def on_done(self, picked):
+        if picked == -1:
+            return
+        device = self.devices[picked]
+        adb = get_setting("adb_command", "adb")
+        args = get_setting("adb_args", ["logcat"])
+        cmd = [adb, "-s", device] + args
+        self.launch(cmd)
 
     def is_enabled(self):
         return not (adb_view.is_open() and adb_view.view.window() != None)
