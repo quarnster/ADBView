@@ -55,6 +55,8 @@ def get_setting(key, default=None, view=None, raw=False):
             except:
                 pass
 
+            print msg
+
             if show:
                 sublime.message_dialog(msg)
         elif key == "adb_args" and value == None:
