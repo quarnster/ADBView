@@ -30,11 +30,21 @@ import traceback
 import telnetlib
 
 
+################################################################################
+#                             Utility functions                                #
+################################################################################
 def get_settings():
     return sublime.load_settings("ADBView.sublime-settings")
 
-
-def get_setting(key, default=None, view=None, raw=False):
+__adb_settings_defaults = {
+    "adb_command": "adb",
+    "adb_args": ["logcat", "-v", "time"],
+    "adb_maxlines": 20000,
+    "adb_filter": ".",
+    "adb_auto_scroll": False,
+    "adb_launch_single": True
+}
+def get_setting(key, view=None, raw=False):
     def myret(key, value):
         if raw:
             return value
@@ -63,8 +73,9 @@ def get_setting(key, default=None, view=None, raw=False):
             cmd = get_setting("adb_command", view, True)
             if type(cmd) == list:
                 value = cmd[1:]
-            else:
-                value = default
+        if value == None:
+            value = __adb_settings_defaults[key] or None
+
         return value
 
     try:
@@ -79,206 +90,37 @@ def get_setting(key, default=None, view=None, raw=False):
     return myret(key, get_settings().get(key))
 
 
-class ADBView(object):
-    LINE = 0
-    FOLD_ALL = 1
-    CLEAR = 2
-    SCROLL = 3
-    VIEWPORT_POSITION = 4
-
-    def __init__(self):
-        self.queue = Queue.Queue()
-        self.name = "ADB"
-        self.closed = True
-        self.view = None
-        self.last_fold = None
-        self.timer = None
-        self.lines = ""
-        self.lock = threading.RLock()
-        self.maxlines = get_setting("adb_maxlines", 20000)
-        self.filter = re.compile(get_setting("adb_filter", "."))
-        self.doScroll = get_setting("adb_auto_scroll", True)
-
-    def is_open(self):
-        return not self.closed
-
-    def open(self):
-        if self.view == None or self.view.window() == None:
-            self.create_view()
-
-    def timed_add(self):
-        try:
-            self.lock.acquire()
-            line = self.lines
-            self.lines = ""
-            self.timer = None
-            self.queue.put((ADBView.LINE, line))
-            sublime.set_timeout(self.update, 0)
-        finally:
-            self.lock.release()
-
-    def add_line(self, line):
-        if self.is_open():
-            try:
-                self.lock.acquire()
-                self.lines += line
-                if self.timer:
-                    self.timer.cancel()
-                if self.lines.count("\n") > 10:
-                    self.timed_add()
+def apply_filter(view, filter):
+    if isinstance(filter, str):
+        filter = re.compile(filter)
+    currRegion = None
+    if is_adb_syntax(view):
+        view.run_command("unfold_all")
+        endline, endcol = view.rowcol(view.size())
+        line = 0
+        currRegion = None
+        regions = []
+        while line < endline:
+            region = view.full_line(view.text_point(line, 0))
+            data = view.substr(region)
+            if filter.search(data) == None:
+                if currRegion == None:
+                    currRegion = region
                 else:
-                    self.timer = threading.Timer(0.1, self.timed_add)
-                    self.timer.start()
-            finally:
-                self.lock.release()
-
-    def scroll(self, line):
-        if self.is_open():
-            self.queue.put((ADBView.SCROLL, line))
-            sublime.set_timeout(self.update, 0)
-
-    def set_viewport_position(self, pos):
-        if self.is_open():
-            self.queue.put((ADBView.VIEWPORT_POSITION, pos))
-            sublime.set_timeout(self.update, 0)
-
-    def clear(self):
-        if self.is_open():
-            self.queue.put((ADBView.CLEAR, None))
-            sublime.set_timeout(self.update, 0)
-
-    def set_filter(self, filter, extra_view=None):
-        try:
-            self.filter = re.compile(filter)
-            if extra_view:
-                self.apply_filter(extra_view)
-            if self.view:
-                self.apply_filter(self.view)
-        except:
-            traceback.print_exc()
-            sublime.error_message("invalid regex")
-
-    def apply_filter(self, view):
-        if is_adb_syntax(view):
-            view.run_command("unfold_all")
-            endline, endcol = view.rowcol(view.size())
-            line = 0
-            currRegion = None
-            regions = []
-            while line < endline:
-                region = view.full_line(view.text_point(line, 0))
-                data = view.substr(region)
-                if self.filter.search(data) == None:
-                    if currRegion == None:
-                        currRegion = region
-                    else:
-                        currRegion = currRegion.cover(region)
-                else:
-                    if currRegion:
-                        # The -1 is to not include the \n and thus making the fold ... appear
-                        # at the end of the last line in the fold, rather than at the
-                        # beginning of the "accepted" line
-                        currRegion = sublime.Region(currRegion.begin()-1, currRegion.end()-1)
-                        regions.append(currRegion)
-                        currRegion = None
-                line += 1
-            if currRegion:
-                regions.append(currRegion)
-            view.fold(regions)
-            if self.view and view.id() == self.view.id():
-                self.last_fold = currRegion
-
-    def create_view(self):
-        self.view = sublime.active_window().new_file()
-        self.view.set_name(self.name)
-        self.view.set_scratch(True)
-        self.view.set_read_only(True)
-        self.view.set_syntax_file("Packages/ADBView/adb.tmLanguage")
-        self.closed = False
-
-    def is_closed(self):
-        return self.closed
-
-    def was_closed(self):
-        self.closed = True
-
-    def fold_all(self):
-        if self.is_open():
-            self.queue.put((ADBView.FOLD_ALL, None))
-
-    def get_view(self):
-        return self.view
-
-    def update(self):
-        if not self.is_open():
-            return
-        try:
-            while True:
-                cmd, data = self.queue.get_nowait()
-                if cmd == ADBView.LINE:
-                    for line in data.split("\n"):
-                        if len(line.strip()) == 0:
-                            continue
-                        line += "\n"
-                        row, col = self.view.rowcol(self.view.size())
-                        e = self.view.begin_edit()
-                        self.view.set_read_only(False)
-
-                        if row+1 > self.maxlines:
-                            self.view.erase(e, self.view.full_line(0))
-                        self.view.insert(e, self.view.size(), line)
-                        self.view.end_edit(e)
-                        self.view.set_read_only(True)
-
-                        if self.filter.search(line) == None:
-                            region = self.view.line(self.view.size()-1)
-                            if self.last_fold != None:
-                                self.view.unfold(self.last_fold)
-                                self.last_fold = self.last_fold.cover(region)
-                            else:
-                                self.last_fold = region
-                            foldregion = sublime.Region(self.last_fold.begin()-1, self.last_fold.end())
-                            self.view.fold(foldregion)
-                        else:
-                            self.last_fold = None
-                elif cmd == ADBView.FOLD_ALL:
-                    self.view.run_command("fold_all")
-                elif cmd == ADBView.CLEAR:
-                    self.view.set_read_only(False)
-                    e = self.view.begin_edit()
-                    self.view.erase(e, sublime.Region(0, self.view.size()))
-                    self.view.end_edit(e)
-                    self.view.set_read_only(True)
-                elif cmd == ADBView.SCROLL:
-                    self.view.run_command("goto_line", {"line": data + 1})
-                elif cmd == ADBView.VIEWPORT_POSITION:
-                    self.view.set_viewport_position(data, True)
-                self.queue.task_done()
-        except Queue.Empty:
-            # get_nowait throws an exception when there's nothing..
-            pass
-        except:
-            traceback.print_exc()
-        finally:
-            if self.doScroll:
-                self.view.show(self.view.size())
-
-
-adb_view = ADBView()
-adb_process = None
-
-
-def output(pipe):
-    while True:
-        try:
-            if adb_process.poll() != None:
-                break
-            line = pipe.readline().strip()
-
-            if len(line) > 0:
-                adb_view.add_line("%s\n" % line)
-        except:
-            traceback.print_exc()
+                    currRegion = currRegion.cover(region)
+            else:
+                if currRegion:
+                    # The -1 is to not include the \n and thus making the fold ... appear
+                    # at the end of the last line in the fold, rather than at the
+                    # beginning of the "accepted" line
+                    currRegion = sublime.Region(currRegion.begin()-1, currRegion.end()-1)
+                    regions.append(currRegion)
+                    currRegion = None
+            line += 1
+        if currRegion:
+            regions.append(currRegion)
+        view.fold(regions)
+    return currRegion
 
 
 def is_adb_syntax(view):
@@ -287,18 +129,207 @@ def is_adb_syntax(view):
     sn = view.scope_name(view.sel()[0].a)
     return sn.startswith("source.adb")
 
+adb_views = []
+def get_adb_view(view):
+    id = view.id()
+    for adb_view in adb_views:
+        if adb_view.view.id() == id:
+            return adb_view
+    return None
+
+def set_filter(view, filter):
+    adb_view = get_adb_view(view)
+    if adb_view:
+        adb_view.set_filter(filter)
+    else:
+        apply_filter(view, filter)
+
+
+################################################################################
+#                ADBView class dealing with ADB Logcat views                   #
+################################################################################
+class ADBView(object):
+    LINE = 0
+    FOLD_ALL = 1
+    CLEAR = 2
+    SCROLL = 3
+    VIEWPORT_POSITION = 4
+
+    def __init__(self, cmd, name=""):
+        self.__queue = Queue.Queue()
+        self.__name = "ADB: %s" % name
+        self.__view = None
+        self.__last_fold = None
+        self.__timer = None
+        self.__lines = ""
+        self.__lock = threading.RLock()
+        self.__maxlines = get_setting("adb_maxlines")
+        self.__filter = re.compile(get_setting("adb_filter"))
+        self.__doScroll = get_setting("adb_auto_scroll")
+        self.__cmd = cmd
+        self.__view = sublime.active_window().new_file()
+        self.__view.set_name(self.__name)
+        self.__view.set_scratch(True)
+        self.__view.set_read_only(True)
+        self.__view.set_syntax_file("Packages/ADBView/adb.tmLanguage")
+        print "running: %s" % cmd
+        self.__adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+        t = threading.Thread(target=self.__output_thread, args=(self.__adb_process.stdout,))
+        t.start()
+
+    def close(self):
+        if self.__adb_process != None and self.__adb_process.poll() == None:
+            self.__adb_process.kill()
+
+    def __timed_add(self):
+        try:
+            self.__lock.acquire()
+            line = self.__lines
+            self.__lines = ""
+            self.__timer = None
+            self.__queue.put((ADBView.LINE, line))
+            sublime.set_timeout(self.__update, 0)
+        finally:
+            self.__lock.release()
+
+    def add_line(self, line):
+        try:
+            self.__lock.acquire()
+            self.__lines += line
+            if self.__timer:
+                self.__timer.cancel()
+            if self.__lines.count("\n") > 10:
+                self.__timed_add()
+            else:
+                self.__timer = threading.Timer(0.1, self.__timed_add)
+                self.__timer.start()
+        finally:
+            self.__lock.release()
+
+    def scroll(self, line):
+        self.__queue.put((ADBView.SCROLL, line))
+        sublime.set_timeout(self.__update, 0)
+
+    def set_viewport_position(self, pos):
+        self.__queue.put((ADBView.VIEWPORT_POSITION, pos))
+        sublime.set_timeout(self.__update, 0)
+
+    def clear(self):
+        self.__queue.put((ADBView.CLEAR, None))
+        sublime.set_timeout(self.__update, 0)
+
+    def set_filter(self, filter):
+        try:
+            self.__filter = re.compile(filter)
+            if self.__view:
+                self.__last_fold = apply_filter(self.__view, self.__filter)
+        except:
+            traceback.print_exc()
+            sublime.error_message("invalid regex")
+
+    def fold_all(self):
+        self.__queue.put((ADBView.FOLD_ALL, None))
+
+    @property
+    def name(self):
+        return self.__name
+
+    @property
+    def view(self):
+        return self.__view
+
+    @property
+    def filter(self):
+        return self.__filter
+
+    @property
+    def running(self):
+        return self.__adb_process.poll() == None
+
+    def __output_thread(self, pipe):
+        while True:
+            try:
+                if self.__adb_process.poll() != None:
+                    break
+                line = pipe.readline().strip()
+
+                if len(line) > 0:
+                    self.add_line("%s\n" % line)
+            except:
+                traceback.print_exc()
+        def __update_name():
+            self.__name += " [Closed]"
+            self.__view.set_name(self.__name)
+        sublime.set_timeout(__update_name, 0)
+
+    def __update(self):
+        try:
+            while True:
+                cmd, data = self.__queue.get_nowait()
+                if cmd == ADBView.LINE:
+                    for line in data.split("\n"):
+                        if len(line.strip()) == 0:
+                            continue
+                        line += "\n"
+                        row, col = self.__view.rowcol(self.__view.size())
+                        e = self.__view.begin_edit()
+                        self.__view.set_read_only(False)
+
+                        if row+1 > self.__maxlines:
+                            self.__view.erase(e, self.__view.full_line(0))
+                        self.__view.insert(e, self.__view.size(), line)
+                        self.__view.end_edit(e)
+                        self.__view.set_read_only(True)
+
+                        if self.__filter.search(line) == None:
+                            region = self.__view.line(self.__view.size()-1)
+                            if self.__last_fold != None:
+                                self.__view.unfold(self.__last_fold)
+                                self.__last_fold = self.__last_fold.cover(region)
+                            else:
+                                self.__last_fold = region
+                            foldregion = sublime.Region(self.__last_fold.begin()-1, self.__last_fold.end())
+                            self.__view.fold(foldregion)
+                        else:
+                            self.__last_fold = None
+                elif cmd == ADBView.FOLD_ALL:
+                    self.__view.run_command("fold_all")
+                elif cmd == ADBView.CLEAR:
+                    self.__view.set_read_only(False)
+                    e = self.__view.begin_edit()
+                    self.__view.erase(e, sublime.Region(0, self.__view.size()))
+                    self.__view.end_edit(e)
+                    self.__view.set_read_only(True)
+                elif cmd == ADBView.SCROLL:
+                    self.__view.run_command("goto_line", {"line": data + 1})
+                elif cmd == ADBView.VIEWPORT_POSITION:
+                    self.__view.set_viewport_position(data, True)
+                self.__queue.task_done()
+        except Queue.Empty:
+            # get_nowait throws an exception when there's nothing..
+            pass
+        except:
+            traceback.print_exc()
+        finally:
+            if self.__doScroll:
+                self.__view.show(self.__view.size())
+
+
+################################################################################
+#                          Sublime Text 2 Commands                             #
+################################################################################
 
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
         match = re.match(r"[\-\d\s:.]*./.+\( *(\d+)\)", data)
         if match != None:
-            adb_view.set_filter("\( *%s\)" % match.group(1), self.view)
+            set_filter(self.view, "\( *%s\)" % match.group(1))
         else:
             sublime.error_message("Couldn't extract process id")
 
     def is_enabled(self):
-        return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
+        return is_adb_syntax(self.view)
 
     def is_visible(self):
         return self.is_enabled()
@@ -309,12 +340,12 @@ class AdbFilterByProcessName(sublime_plugin.TextCommand):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
         match = re.match(r"[\-\d\s:.]*./(.+)\( *\d+\)", data)
         if match != None:
-            adb_view.set_filter("%s\( *\d+\)" % match.group(1), self.view)
+            set_filter(self.view, "%s\( *\d+\)" % match.group(1))
         else:
             sublime.error_message("Couldn't extract process name")
 
     def is_enabled(self):
-        return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
+        return is_adb_syntax(self.view)
 
     def is_visible(self):
         return self.is_enabled()
@@ -325,12 +356,12 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
         match = re.match(r"[\-\d\s:.]*(\w)/.+\( *\d+\)", data)
         if match != None:
-            adb_view.set_filter("%s/.+\( *\d+\)" % match.group(1), self.view)
+            set_filter(self.view, "%s/.+\( *\d+\)" % match.group(1))
         else:
             sublime.error_message("Couldn't extract Message level")
 
     def is_enabled(self):
-        return is_adb_syntax(self.view) or (adb_view.is_open() and adb_view.get_view().id() == self.view.id())
+        return is_adb_syntax(self.view)
 
     def is_visible(self):
         return self.is_enabled()
@@ -338,7 +369,7 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
 
 class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
-        adb = get_setting("adb_command", "adb")
+        adb = get_setting("adb_command")
         cmd = [adb, "devices"]
         try:
             proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
@@ -353,7 +384,9 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             if line not in ["", "List of devices attached"]:
                 self.devices.append(re.sub(r"[ \t]*device$", "", line))
         # build quick menu options displaying name, version, and device id
-        options = []
+        self.options = []
+        for view in adb_views:
+            self.options.append([view.name, "Focus existing view"])
         for device in self.devices:
             # dump build.prop
             cmd = [adb, "-s", device, "shell", "cat /system/build.prop"]
@@ -379,63 +412,76 @@ class AdbLaunch(sublime_plugin.WindowCommand):
                 version = version[0]
             else:
                 version = "x.x.x"
-            options.append("%s %s - %s" % (product, version, device))
-        if len(options) == 0:
-            sublime.status_message("ADB: No device attached!")
-        elif len(options) == 1:
-            adb = get_setting("adb_command", "adb")
-            args = get_setting("adb_args", ["logcat"])
-            self.launch([adb] + args)
-        else:
-            self.window.show_quick_panel(options, self.on_done)
+            product = str(product).strip()
+            version = str(version).strip()
+            device = str(device).strip()
+            self.options.append("%s %s - %s" % (product, version, device))
 
-    def launch(self, cmd):
-        global adb_process
-        if adb_process != None and adb_process.poll() == None:
-            adb_process.kill()
-        print "running: %s" % cmd
-        adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
-        adb_view.open()
-        t = threading.Thread(target=output, args=(adb_process.stdout,))
-        t.start()
+        if len(self.options) == 0:
+            sublime.status_message("ADB: No device attached!")
+        elif len(self.options) == 1 and len(adb_views) == 0 and get_setting("adb_launch_single"):
+            adb = get_setting("adb_command")
+            args = get_setting("adb_args")
+            self.launch([adb] + args, self.options[0])
+        else:
+            self.window.show_quick_panel(self.options, self.on_done)
+
+    def launch(self, cmd, name):
+        adb_views.append(ADBView(cmd, name))
 
     def on_done(self, picked):
         if picked == -1:
             return
+        if picked < len(adb_views):
+            view = adb_views[picked].view
+            window = view.window()
+            if window == None:
+                # This is silly, but apparently the view is considered windowless
+                # when it is not focused
+                found = False
+                for window in sublime.windows():
+                    for view2 in window.views():
+                        if view2.id() == view.id():
+                            found = True
+                            break
+                    if found:
+                        break
+            window.focus_view(view)
+            return
+        name = self.options[picked]
+        picked -= len(adb_views)
         device = self.devices[picked]
-        adb = get_setting("adb_command", "adb")
-        args = get_setting("adb_args", ["logcat"])
+        adb = get_setting("adb_command")
+        args = get_setting("adb_args")
         cmd = [adb, "-s", device] + args
-        self.launch(cmd)
+        self.launch(cmd, name)
 
-    def is_enabled(self):
-        return not (adb_view.is_open() and adb_view.view.window() != None)
-
-
-class AdbSetFilter(sublime_plugin.WindowCommand):
+class AdbSetFilter(sublime_plugin.TextCommand):
     def set_filter(self, data):
-        extra_view = None
-        w = sublime.active_window()
-        if w:
-            extra_view = w.active_view()
-        adb_view.set_filter(data, extra_view)
+       set_filter(self.view, data)
 
-    def run(self):
-        self.window.show_input_panel("ADB Regex filter", adb_view.filter.pattern, self.set_filter, None, None)
+    def run(self, edit):
+        adb_view = get_adb_view(self.view)
+        if adb_view:
+            filter = adb_view.filter.pattern
+        else:
+            filter = get_setting("adb_filter")
+        self.view.window().show_input_panel("ADB Regex filter", filter, self.set_filter, None, None)
 
     def is_enabled(self):
-        return is_adb_syntax(sublime.active_window().active_view()) or (adb_process != None and adb_view.is_open())
+        return is_adb_syntax(self.view)
 
     def is_visible(self):
         return self.is_enabled()
 
 
-class AdbClearView(sublime_plugin.WindowCommand):
-    def run(self):
-        adb_view.clear()
+class AdbClearView(sublime_plugin.TextCommand):
+    def run(self, edit):
+        get_adb_view(self.view).clear()
 
     def is_enabled(self):
-        return adb_process != None and adb_view.is_open()
+        adb_view = get_adb_view(self.view)
+        return adb_view
 
     def is_visible(self):
         return self.is_enabled()
@@ -443,6 +489,8 @@ class AdbClearView(sublime_plugin.WindowCommand):
 
 class AdbEventListener(sublime_plugin.EventListener):
     def on_close(self, view):
-        if adb_view.is_open() and view.id() == adb_view.get_view().id():
-            adb_view.was_closed()
-            adb_process.kill()
+        adb_view = get_adb_view(view)
+        if adb_view:
+            adb_view.close()
+            adb_views.remove(adb_view)
+        view.settings().erase("adb_has_shown_message")
