@@ -23,6 +23,7 @@ freely, subject to the following restrictions:
 import sublime
 import sublime_plugin
 import subprocess
+import os
 import Queue
 import re
 import threading
@@ -173,7 +174,11 @@ class ADBView(object):
         self.__view.set_read_only(True)
         self.__view.set_syntax_file("Packages/ADBView/adb.tmLanguage")
         print "running: %s" % cmd
-        self.__adb_process = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+        info = None
+        if os.name == 'nt':
+            info = subprocess.STARTUPINFO()
+            info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        self.__adb_process = subprocess.Popen(cmd, startupinfo=info, stdout=subprocess.PIPE)
         t = threading.Thread(target=self.__output_thread, args=(self.__adb_process.stdout,))
         t.start()
 
