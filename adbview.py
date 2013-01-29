@@ -198,7 +198,6 @@ class ADBView(object):
             self.__loading.start()
 
     def __load_finished(self):
-        print("Should scroll to the end...")
         self.__loading = None
         sublime.set_timeout(lambda: self.__view.show(self.__view.size()), 0)
 
@@ -328,7 +327,6 @@ class ADBView(object):
                         snapPoint = self.__view.text_to_layout(snapPoint)[1]
                         p = self.__view.viewport_position()[1] + self.__view.viewport_extent()[1]
                         ns = p < snapPoint
-                        print(p, snapPoint, p < snapPoint)
                         if ns != self.__manualScroll:
                             self.__manualScroll = ns
                             sublime.status_message("ADB: manual scrolling enabled" if self.__manualScroll else "ADB: automatic scrolling enabled")
