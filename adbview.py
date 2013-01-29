@@ -46,8 +46,10 @@ __adb_settings_defaults = {
     "adb_args": ["logcat", "-v", "time"],
     "adb_maxlines": 20000,
     "adb_filter": ".",
-    "adb_auto_scroll": False,
-    "adb_launch_single": True
+    "adb_auto_scroll": True,
+    "adb_launch_single": True,
+    "adb_snap_lines": 5,
+    "adb_delay_scrolling": True
 }
 def get_setting(key, view=None, raw=False):
     def myret(key, value):
@@ -170,12 +172,19 @@ class ADBView(object):
         self.__maxlines = get_setting("adb_maxlines")
         self.__filter = re.compile(get_setting("adb_filter"))
         self.__doScroll = get_setting("adb_auto_scroll")
+        self.__manualScroll = False
+        self.__snapLines = get_setting("adb_snap_lines")
         self.__cmd = cmd
         self.__view = sublime.active_window().new_file()
         self.__view.set_name(self.__name)
         self.__view.set_scratch(True)
         self.__view.set_read_only(True)
         self.__view.set_syntax_file("Packages/ADBView/adb.tmLanguage")
+        if get_setting("adb_delay_scrolling"):
+            self.__loading = threading.Timer(0.25, self.__load_finished)
+        else:
+            self.__loading = None
+
         print("running: %s" % cmd)
         info = None
         if os.name == 'nt':
@@ -184,6 +193,14 @@ class ADBView(object):
         self.__adb_process = subprocess.Popen(cmd, startupinfo=info, stdout=subprocess.PIPE)
         t = threading.Thread(target=self.__output_thread, args=(self.__adb_process.stdout,))
         t.start()
+
+        if self.__loading:
+            self.__loading.start()
+
+    def __load_finished(self):
+        print("Should scroll to the end...")
+        self.__loading = None
+        sublime.set_timeout(lambda: self.__view.show(self.__view.size()), 0)
 
     def close(self):
         if self.__adb_process != None and self.__adb_process.poll() == None:
@@ -204,6 +221,12 @@ class ADBView(object):
         try:
             self.__lock.acquire()
             self.__lines += line
+
+            if self.__loading:
+                self.__loading.cancel()
+                self.__loading = threading.Timer(0.25, self.__load_finished)
+                self.__loading.start()
+
             if self.__timer:
                 self.__timer.cancel()
             if self.__lines.count("\n") > 10:
@@ -290,12 +313,25 @@ class ADBView(object):
                 self.__view.fold(foldregion)
             else:
                 self.__last_fold = None
+        if not self.__loading and self.__doScroll and not self.__manualScroll:
+            self.__view.show(self.__view.size())
 
     def __update(self):
         try:
             while True:
                 cmd, data = self.__queue.get_nowait()
                 if cmd == ADBView.LINE:
+                    if not self.__loading and self.__doScroll:
+                        snapPoint = self.__view.size()
+                        for i in range(self.__snapLines):
+                            snapPoint = self.__view.line(snapPoint).begin()-1
+                        snapPoint = self.__view.text_to_layout(snapPoint)[1]
+                        p = self.__view.viewport_position()[1] + self.__view.viewport_extent()[1]
+                        ns = p < snapPoint
+                        print(p, snapPoint, p < snapPoint)
+                        if ns != self.__manualScroll:
+                            self.__manualScroll = ns
+                            sublime.status_message("ADB: manual scrolling enabled" if self.__manualScroll else "ADB: automatic scrolling enabled")
                     self.__view.run_command("adb_add_line", {"data": data})
                 elif cmd == ADBView.FOLD_ALL:
                     self.__view.run_command("fold_all")
@@ -309,9 +345,6 @@ class ADBView(object):
             pass
         except:
             traceback.print_exc()
-        finally:
-            if self.__doScroll:
-                self.__view.show(self.__view.size())
 
 
 ################################################################################

@@ -5,8 +5,15 @@
     // ADB arguments that should be used.
     "adb_args": ["logcat", "-v", "time"],
 
-    // Set to true to enable auto scroll of the ADB view
-    "adb_auto_scroll": false,
+    // Set to false to disable auto scroll of the ADB view
+    "adb_auto_scroll": true,
+
+    // The number of lines at the end of the buffer to use as the "snap point" when
+    // switching between the automatic and manual scrolling modes
+    "adb_snap_lines": 5,
+
+    // Whether to delay scrolling until buffer has finished loading when first connecting or not
+    "adb_delay_scrolling": true,
 
     // Max number of lines in the adb logcat buffer
     "adb_maxlines": 20000,
