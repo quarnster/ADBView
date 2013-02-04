@@ -51,6 +51,12 @@ __adb_settings_defaults = {
     "adb_snap_lines": 5,
     "adb_delay_scrolling": True
 }
+def decode(in):
+    try:
+        return in.decode(sys.getdefaultencoding())
+    except:
+        return in
+
 def get_setting(key, view=None, raw=False):
     def myret(key, value):
         if raw:
@@ -277,7 +283,7 @@ class ADBView(object):
             try:
                 if self.__adb_process.poll() != None:
                     break
-                line = pipe.readline().strip().decode(sys.getdefaultencoding())
+                line = decode(pipe.readline().strip())
 
                 if len(line) > 0:
                     self.add_line("%s\n" % line)
@@ -408,7 +414,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         try:
             proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
             out,err = proc.communicate()
-            out = out.decode(sys.getdefaultencoding())
+            out = decode(out)
         except:
             sublime.error_message("Error trying to launch ADB:\n\n%s\n\n%s" % (cmd, traceback.format_exc()))
             return
@@ -426,7 +432,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             # dump build.prop
             cmd = [adb, "-s", device, "shell", "cat /system/build.prop"]
             proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
-            build_prop = proc.stdout.read().strip().decode(sys.getdefaultencoding())
+            build_prop = decode(proc.stdout.read().strip())
             # get name
             product = "Unknown"  # should never actually see this
             if device.startswith("emulator"):
