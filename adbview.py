@@ -51,11 +51,11 @@ __adb_settings_defaults = {
     "adb_snap_lines": 5,
     "adb_delay_scrolling": True
 }
-def decode(in):
+def decode(ind):
     try:
-        return in.decode(sys.getdefaultencoding())
+        return ind.decode(sys.getdefaultencoding())
     except:
-        return in
+        return ind
 
 def get_setting(key, view=None, raw=False):
     def myret(key, value):
