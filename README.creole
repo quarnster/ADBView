@@ -6,6 +6,7 @@ Please go [[https://github.com/quarnster/ADBView/issues?sort=created&direction=d
 
 === Prerequisites ===
   # The Android SDK should be installed, and ADB should be in your path.
+  # If you want to connect to the emulator on Windows, you'll have to [enable telnet](http://social.technet.microsoft.com/wiki/contents/articles/910.enabling-telnet-client-in-windows-7-en-us.aspx). See #16.
 
 === Installation ===
     # The easiest way to install this plugin is via the excellent Package Control Plugin

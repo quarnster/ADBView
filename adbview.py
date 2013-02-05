@@ -436,7 +436,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             # get name
             product = "Unknown"  # should never actually see this
             if device.startswith("emulator"):
-                port = device.rsplit("-")[-1]
+                port = int(device.rsplit("-")[-1])
                 t = telnetlib.Telnet("localhost", port)
                 t.read_until("OK", 1000)
                 t.write("avd name\n")
