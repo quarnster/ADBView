@@ -438,9 +438,9 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             if device.startswith("emulator"):
                 port = int(device.rsplit("-")[-1])
                 t = telnetlib.Telnet("localhost", port)
-                t.read_until("OK", 1000)
-                t.write("avd name\n")
-                product = t.read_until("OK", 1000)
+                t.read_until(b"OK", 1000)
+                t.write(b"avd name\n")
+                product = t.read_until(b"OK", 1000).decode("utf-8")
                 t.close()
                 product = product.replace("OK", "").strip()
             else:
