@@ -298,6 +298,7 @@ class ADBView(object):
         sublime.set_timeout(__update_name, 0)
 
     def process_lines(self, e, data):
+        overflowed = False
         for line in data.split("\n"):
             if len(line.strip()) == 0:
                 continue
@@ -306,6 +307,7 @@ class ADBView(object):
             self.__view.set_read_only(False)
 
             if row+1 > self.__maxlines:
+                overflowed = True
                 head_line = self.__view.full_line(0)
                 if self.__last_fold is not None:
                     self.__last_fold = sublime.Region(self.__last_fold.begin() - head_line.size(), 
@@ -326,6 +328,9 @@ class ADBView(object):
             else:
                 self.__last_fold = None
         if not self.__loading and self.__doScroll and not self.__manualScroll:
+            if overflowed:
+                # hack, force sublime to scroll to the bottom
+                self.__view.show(0)
             self.__view.show(self.__view.size())
 
     def __update(self):
