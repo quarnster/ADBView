@@ -53,9 +53,12 @@ __adb_settings_defaults = {
 }
 def decode(ind):
     try:
-        return ind.decode(sys.getdefaultencoding())
+        return ind.decode("utf-8")
     except:
-        return ind
+        try:
+            return ind.decode(sys.getdefaultencoding())
+        except:
+            return ind
 
 def get_setting(key, view=None, raw=False):
     def myret(key, value):
@@ -167,9 +170,10 @@ class ADBView(object):
     SCROLL = 3
     VIEWPORT_POSITION = 4
 
-    def __init__(self, cmd, name=""):
+    def __init__(self, cmd, name="", device=""):
         self.__queue = Queue.Queue()
         self.__name = "ADB: %s" % name
+        self.__device = device
         self.__view = None
         self.__last_fold = None
         self.__timer = None
@@ -267,6 +271,10 @@ class ADBView(object):
         return self.__name
 
     @property
+    def device(self):
+        return self.__device
+
+    @property
     def view(self):
         return self.__view
 
@@ -295,6 +303,7 @@ class ADBView(object):
         sublime.set_timeout(__update_name, 0)
 
     def process_lines(self, e, data):
+        overflowed = False
         for line in data.split("\n"):
             if len(line.strip()) == 0:
                 continue
@@ -303,7 +312,12 @@ class ADBView(object):
             self.__view.set_read_only(False)
 
             if row+1 > self.__maxlines:
-                self.__view.erase(e, self.__view.full_line(0))
+                overflowed = True
+                head_line = self.__view.full_line(0)
+                if self.__last_fold is not None:
+                    self.__last_fold = sublime.Region(self.__last_fold.begin() - head_line.size(), 
+                                                      self.__last_fold.end() - head_line.size())
+                self.__view.erase(e, head_line)
             self.__view.insert(e, self.__view.size(), line)
             self.__view.set_read_only(True)
 
@@ -319,6 +333,9 @@ class ADBView(object):
             else:
                 self.__last_fold = None
         if not self.__loading and self.__doScroll and not self.__manualScroll:
+            if overflowed:
+                # hack, force sublime to scroll to the bottom
+                self.__view.show(0)
             self.__view.show(self.__view.size())
 
     def __update(self):
@@ -357,7 +374,10 @@ class ADBView(object):
 
 class AdbAddLine(sublime_plugin.TextCommand):
     def run(self, e, data):
-        get_adb_view(self.view).process_lines(e, data)
+        adb_view = get_adb_view(self.view)
+        if adb_view:
+            adb_view.process_lines(e, data)
+
 
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -399,6 +419,34 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
             set_filter(self.view, "%s/.+\( *\d+\)" % match.group(1))
         else:
             sublime.error_message("Couldn't extract Message level")
+
+    def is_enabled(self):
+        return is_adb_syntax(self.view)
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
+class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
+    def run(self, edit):
+        device = get_adb_view(self.view).device
+        if device == "":
+            sublime.error_message("Device is unset")
+            return
+        adb = get_setting("adb_command")
+        cmd = [adb, "-s", device, "jdwp"]
+        try:
+            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            out,err = proc.communicate()
+            out = decode(out)
+        except:
+            sublime.error_message("Error trying to launch ADB:\n\n%s\n\n%s" % (cmd, traceback.format_exc()))
+            return
+        pids = re.findall(r'\d+', out)
+        if len(pids) > 0:
+            set_filter(self.view, "\( *(%s)\)" % "|".join(pids))
+        else:
+            sublime.error_message("No debuggable apps")
 
     def is_enabled(self):
         return is_adb_syntax(self.view)
@@ -463,12 +511,12 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         elif len(self.options) == 1 and len(adb_views) == 0 and get_setting("adb_launch_single"):
             adb = get_setting("adb_command")
             args = get_setting("adb_args")
-            self.launch([adb] + args, self.options[0])
+            self.launch([adb] + args, self.options[0], self.devices[0])
         else:
             self.window.show_quick_panel(self.options, self.on_done)
 
-    def launch(self, cmd, name):
-        adb_views.append(ADBView(cmd, name))
+    def launch(self, cmd, name, device):
+        adb_views.append(ADBView(cmd, name, device))
 
     def on_done(self, picked):
         if picked == -1:
@@ -495,7 +543,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         adb = get_setting("adb_command")
         args = get_setting("adb_args")
         cmd = [adb, "-s", device] + args
-        self.launch(cmd, name)
+        self.launch(cmd, name, device)
 
 class AdbSetFilter(sublime_plugin.TextCommand):
     def set_filter(self, data):

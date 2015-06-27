@@ -27,6 +27,7 @@ Message filters can be set by clicking a line in the logcat view and then right 
     # ADB Filter by Process ID
     # ADB Filter by Process Name
     # ADB Filter by Message Level
+    # ADB Filter by Debuggable Apps
     # ADB Custom Regular Expression Filter
 
 You can also specify a custom regular expression filter in the preferences or project settings.
