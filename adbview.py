@@ -361,7 +361,10 @@ class ADBView(object):
 
 class AdbAddLine(sublime_plugin.TextCommand):
     def run(self, e, data):
-        get_adb_view(self.view).process_lines(e, data)
+        adb_view = get_adb_view(self.view)
+        if adb_view:
+            adb_view.process_lines(e, data)
+
 
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
