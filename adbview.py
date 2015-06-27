@@ -306,7 +306,11 @@ class ADBView(object):
             self.__view.set_read_only(False)
 
             if row+1 > self.__maxlines:
-                self.__view.erase(e, self.__view.full_line(0))
+                head_line = self.__view.full_line(0)
+                if self.__last_fold is not None:
+                    self.__last_fold = sublime.Region(self.__last_fold.begin() - head_line.size(), 
+                                                      self.__last_fold.end() - head_line.size())
+                self.__view.erase(e, head_line)
             self.__view.insert(e, self.__view.size(), line)
             self.__view.set_read_only(True)
 
