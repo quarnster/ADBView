@@ -53,9 +53,12 @@ __adb_settings_defaults = {
 }
 def decode(ind):
     try:
-        return ind.decode(sys.getdefaultencoding())
+        return ind.decode("utf-8")
     except:
-        return ind
+        try:
+            return ind.decode(sys.getdefaultencoding())
+        except:
+            return ind
 
 def get_setting(key, view=None, raw=False):
     def myret(key, value):
@@ -325,6 +328,7 @@ class ADBView(object):
         try:
             while True:
                 cmd, data = self.__queue.get_nowait()
+                data = decode(data)
                 if cmd == ADBView.LINE:
                     if not self.__loading and self.__doScroll:
                         snapPoint = self.__view.size()
