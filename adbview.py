@@ -170,9 +170,10 @@ class ADBView(object):
     SCROLL = 3
     VIEWPORT_POSITION = 4
 
-    def __init__(self, cmd, name=""):
+    def __init__(self, cmd, name="", device=""):
         self.__queue = Queue.Queue()
         self.__name = "ADB: %s" % name
+        self.__device = device
         self.__view = None
         self.__last_fold = None
         self.__timer = None
@@ -268,6 +269,10 @@ class ADBView(object):
     @property
     def name(self):
         return self.__name
+
+    @property
+    def device(self):
+        return self.__device
 
     @property
     def view(self):
@@ -423,6 +428,34 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
         return self.is_enabled()
 
 
+class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
+    def run(self, edit):
+        device = get_adb_view(self.view).device
+        if device == "":
+            sublime.error_message("Device is unset")
+            return
+        adb = get_setting("adb_command")
+        cmd = [adb, "-s", device, "jdwp"]
+        try:
+            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            out,err = proc.communicate()
+            out = decode(out)
+        except:
+            sublime.error_message("Error trying to launch ADB:\n\n%s\n\n%s" % (cmd, traceback.format_exc()))
+            return
+        pids = re.findall(r'\d+', out)
+        if len(pids) > 0:
+            set_filter(self.view, "\( *(%s)\)" % "|".join(pids))
+        else:
+            sublime.error_message("No debuggable apps")
+
+    def is_enabled(self):
+        return is_adb_syntax(self.view)
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
 class AdbLaunch(sublime_plugin.WindowCommand):
     def run(self):
         adb = get_setting("adb_command")
@@ -479,12 +512,12 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         elif len(self.options) == 1 and len(adb_views) == 0 and get_setting("adb_launch_single"):
             adb = get_setting("adb_command")
             args = get_setting("adb_args")
-            self.launch([adb] + args, self.options[0])
+            self.launch([adb] + args, self.options[0], self.devices[0])
         else:
             self.window.show_quick_panel(self.options, self.on_done)
 
-    def launch(self, cmd, name):
-        adb_views.append(ADBView(cmd, name))
+    def launch(self, cmd, name, device):
+        adb_views.append(ADBView(cmd, name, device))
 
     def on_done(self, picked):
         if picked == -1:
@@ -511,7 +544,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         adb = get_setting("adb_command")
         args = get_setting("adb_args")
         cmd = [adb, "-s", device] + args
-        self.launch(cmd, name)
+        self.launch(cmd, name, device)
 
 class AdbSetFilter(sublime_plugin.TextCommand):
     def set_filter(self, data):
