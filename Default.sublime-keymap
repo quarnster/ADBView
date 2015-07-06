@@ -1,5 +1,4 @@
 [
-
     {
         "command": "adb_launch",
         "keys": ["ctrl+alt+d"]

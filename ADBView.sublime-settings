@@ -12,9 +12,6 @@
     // switching between the automatic and manual scrolling modes
     "adb_snap_lines": 5,
 
-    // Whether to delay scrolling until buffer has finished loading when first connecting or not
-    "adb_delay_scrolling": true,
-
     // Max number of lines in the adb logcat buffer
     "adb_maxlines": 20000,
 
