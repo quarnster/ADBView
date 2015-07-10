@@ -175,8 +175,8 @@ class ADBView(object):
         self.__cond = threading.Condition()
         self.__maxlines = get_setting("adb_maxlines")
         self.__filter = re.compile(get_setting("adb_filter"))
-        self.__doScroll = get_setting("adb_auto_scroll")
-        self.__manualScroll = False
+        self.__do_scroll = get_setting("adb_auto_scroll")
+        self.__manual_scroll = False
         self.__snapLines = get_setting("adb_snap_lines")
         self.__cmd = cmd
         self.__closing = False
@@ -281,15 +281,15 @@ class ADBView(object):
                 sublime.set_timeout(gen_func(self.__view, lines), 0)
 
     def __check_autoscroll(self):
-        if self.__doScroll:
+        if self.__do_scroll:
             row, _ = self.__view.rowcol(self.__view.size())
             snap_point = self.__view.text_point(max(0, row - self.__snapLines), 0)
             snap_point = self.__view.text_to_layout(snap_point)[1]
             p = self.__view.viewport_position()[1] + self.__view.viewport_extent()[1]
             ns = p < snap_point
-            if ns != self.__manualScroll:
-                self.__manualScroll = ns
-                sublime.status_message("ADB: manual scrolling enabled" if self.__manualScroll else "ADB: automatic scrolling enabled")
+            if ns != self.__manual_scroll:
+                self.__manual_scroll = ns
+                sublime.status_message("ADB: manual scrolling enabled" if self.__manual_scroll else "ADB: automatic scrolling enabled")
 
     def process_lines(self, e, data):
         overflowed = 0
@@ -327,7 +327,7 @@ class ADBView(object):
         if self.__last_fold is not None:
             foldregion = sublime.Region(self.__last_fold.begin()-1, self.__last_fold.end())
             self.__view.fold(foldregion)
-        if self.__doScroll and not self.__manualScroll:
+        if self.__do_scroll and not self.__manual_scroll:
             if overflowed > 0:
                 # hack, force sublime to scroll to the bottom
                 self.__view.show(0)
