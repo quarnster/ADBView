@@ -1,9 +1,11 @@
 [
     { "caption": "-", "id": "adb" },
     { "command": "adb_filter_by_process_id", "caption": "ADB Filter by Process ID" },
-    { "command": "adb_filter_by_process_name", "caption": "ADB Filter by Process Name"},
-    { "command": "adb_filter_by_message_level", "caption": "ADB Filter by Message Level"},
-    { "command": "adb_filter_by_debuggable_apps", "caption": "ADB Filter by Debuggable Apps"},
-    { "command": "adb_set_filter", "caption": "ADB Custom Regular Expression Filter"},
-    { "command": "adb_clear_view", "caption": "ADB Clear View"}
+    { "command": "adb_filter_by_process_name", "caption": "ADB Filter by Process Name" },
+    { "command": "adb_filter_by_message_level", "caption": "ADB Filter by Message Level" },
+    { "command": "adb_filter_by_debuggable_apps", "caption": "ADB Filter by Debuggable Apps" },
+    { "command": "adb_filter_by_containing_selections", "caption": "ADB Filter by Containing Selections" },
+    { "command": "adb_filter_by_excluding_selections", "caption": "ADB Filter by Excluding Selections" },
+    { "command": "adb_set_filter", "caption": "ADB Custom Regular Expression Filter" },
+    { "command": "adb_clear_view", "caption": "ADB Clear View" }
 ]

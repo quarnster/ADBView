@@ -30,6 +30,11 @@ Message filters can be set by clicking a line in the logcat view and then right 
     # ADB Filter by Debuggable Apps
     # ADB Custom Regular Expression Filter
 
+Or by selecting some text and then right click and choose one of the menu options:
+
+    # ADB Filter by Containing Selections
+    # ADB Filter by Excluding Selections
+
 You can also specify a custom regular expression filter in the preferences or project settings.
 
 === License ===

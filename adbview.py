@@ -107,7 +107,7 @@ def get_setting(key, view=None, raw=False):
 
 
 def apply_filter(view, filter):
-    if isinstance(filter, str):
+    if isinstance(filter, (str, unicode)):
         filter = re.compile(filter)
     currRegion = None
     if is_adb_syntax(view):
@@ -419,6 +419,60 @@ class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
 
     def is_enabled(self):
         return is_adb_syntax(self.view)
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
+class AdbFilterByContainingSelections(sublime_plugin.TextCommand):
+    def set_filter(self, data):
+       set_filter(self.view, data)
+
+    def run(self, edit):
+        adb_view = get_adb_view(self.view)
+        if adb_view:
+            filter = adb_view.filter.pattern
+        else:
+            filter = get_setting("adb_filter")
+        for region in self.view.sel():
+            if region.size() == 0:
+                continue
+            content_re = "(?=.*%s)" % re.escape(self.view.substr(region))
+            if filter.startswith("^"):
+                filter = "^%s%s" % (content_re, filter[1:])
+            else:
+                filter = "^%s.*?%s" % (content_re, filter)
+        self.set_filter(filter)
+
+    def is_enabled(self):
+        return is_adb_syntax(self.view) and any([r.size() > 0 for r in self.view.sel()])
+
+    def is_visible(self):
+        return self.is_enabled()
+
+
+class AdbFilterByExcludingSelections(sublime_plugin.TextCommand):
+    def set_filter(self, data):
+       set_filter(self.view, data)
+
+    def run(self, edit):
+        adb_view = get_adb_view(self.view)
+        if adb_view:
+            filter = adb_view.filter.pattern
+        else:
+            filter = get_setting("adb_filter")
+        for region in self.view.sel():
+            if region.size() == 0:
+                continue
+            content_re = "(?!.*%s)" % re.escape(self.view.substr(region))
+            if filter.startswith("^"):
+                filter = "^%s%s" % (content_re, filter[1:])
+            else:
+                filter = "^%s.*?%s" % (content_re, filter)
+        self.set_filter(filter)
+
+    def is_enabled(self):
+        return is_adb_syntax(self.view) and any([r.size() > 0 for r in self.view.sel()])
 
     def is_visible(self):
         return self.is_enabled()
