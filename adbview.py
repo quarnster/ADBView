@@ -395,7 +395,10 @@ class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
 
 class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
     def run(self, edit):
-        device = get_adb_view(self.view).device
+        adb_view = get_adb_view(self.view)
+        if adb_view is None:
+            return
+        device = adb_view.device
         if device == "":
             sublime.error_message("Device is unset")
             return
@@ -436,7 +439,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         self.devices = []
         for line in out.split("\n"):
             line = line.strip()
-            if line not in ["", "List of devices attached"]:
+            if line.endswith("device"):
                 self.devices.append(re.sub(r"[ \t]*device$", "", line))
         # build quick menu options displaying name, version, and device id
         self.options = []
