@@ -171,7 +171,7 @@ class ADBView(object):
         self.__view = None
         self.__last_fold = None
         self.__timer = None
-        self.__lines = ""
+        self.__lines = []
         self.__cond = threading.Condition()
         self.__maxlines = get_setting("adb_maxlines")
         self.__filter = re.compile(get_setting("adb_filter"))
@@ -239,7 +239,7 @@ class ADBView(object):
 
                 if len(line) > 0:
                     with self.__cond:
-                        self.__lines += (line + "\n")
+                        self.__lines.append(line + "\n")
                         self.__cond.notify()
             except UnicodeDecodeError, e:
                 print "[ADBView] UnicodeDecodeError occurred:", e
@@ -271,7 +271,7 @@ class ADBView(object):
             lines = None
             with self.__cond:
                 lines = self.__lines
-                self.__lines = ""
+                self.__lines = []
 
             if len(lines) > 0:
                 def gen_func(view, lines):
@@ -291,13 +291,10 @@ class ADBView(object):
                 self.__manual_scroll = ns
                 sublime.status_message("ADB: manual scrolling enabled" if self.__manual_scroll else "ADB: automatic scrolling enabled")
 
-    def process_lines(self, e, data):
+    def process_lines(self, e, lines):
         overflowed = 0
         row, _ = self.__view.rowcol(self.__view.size())
-        for line in data.split("\n"):
-            if len(line.strip()) == 0:
-                continue
-            line += "\n"
+        for line in lines:
             row += 1
             if row > self.__maxlines:
                 overflowed += 1
