@@ -26,10 +26,6 @@ import subprocess
 import os
 import sys
 import time
-try:
-    import Queue
-except:
-    import queue as Queue
 import re
 import threading
 import traceback
@@ -325,10 +321,10 @@ class ADBView(object):
             foldregion = sublime.Region(self.__last_fold.begin()-1, self.__last_fold.end())
             self.__view.fold(foldregion)
         if self.__do_scroll and not self.__manual_scroll:
-            if overflowed > 0:
-                # hack, force sublime to scroll to the bottom
-                self.__view.show(0)
-            self.__view.show(self.__view.size())
+            # keep the position of horizontal scroll bar
+            curr = self.__view.viewport_position()
+            bottom = self.__view.text_to_layout(self.__view.size())
+            self.__view.set_viewport_position((curr[0], bottom[1]), True)
 
 
 ################################################################################
