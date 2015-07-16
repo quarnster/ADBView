@@ -47,6 +47,24 @@ __adb_settings_defaults = {
     "adb_launch_single": True,
     "adb_snap_lines": 5
 }
+
+def __decode_wrap(dec):
+    def __decode2(line):
+        line = dec(line)
+        try:
+            # Only for Python2, in 3 str == unicode and the type unicode doesn't exist
+            if not isinstance(line, unicode):
+                line = line.decode("utf-8", "ignore")
+        except UnicodeDecodeError as e:
+            print("[ADBView] UnicodeDecodeError occurred:", e)
+            print("[ADBView] the line is: ", [ord(c) for c in line])
+        except:
+            # Probably Python 3
+            pass
+        return line
+    return __decode2
+
+@__decode_wrap
 def decode(ind):
     try:
         return ind.decode("utf-8")
@@ -100,10 +118,15 @@ def get_setting(key, view=None, raw=False):
         traceback.print_exc()
         pass
     return myret(key, get_settings().get(key))
-
+try:
+    # Python 2
+    __filter_types = (str, unicode)
+except NameError:
+    # Python 3 doesn't have the unicode type
+    __filter_types = (str)
 
 def apply_filter(view, filter):
-    if isinstance(filter, (str, unicode)):
+    if isinstance(filter, __filter_types):
         filter = re.compile(filter)
     currRegion = None
     if is_adb_syntax(view):
@@ -230,16 +253,11 @@ class ADBView(object):
                 if self.__adb_process.poll() != None:
                     break
                 line = decode(pipe.readline().strip())
-                if not isinstance(line, unicode):
-                    line = line.decode("utf-8", "ignore")
 
                 if len(line) > 0:
                     with self.__cond:
                         self.__lines.append(line + "\n")
                         self.__cond.notify()
-            except UnicodeDecodeError, e:
-                print "[ADBView] UnicodeDecodeError occurred:", e
-                print "[ADBView] the line is: ", [ord(c) for c in line]
             except:
                 traceback.print_exc()
         def __update_name():
@@ -315,7 +333,7 @@ class ADBView(object):
             self.__view.erase(e, remove_region)
             self.__view.set_read_only(True)
             if self.__last_fold is not None:
-                self.__last_fold = sublime.Region(self.__last_fold.begin() - remove_region.size(), 
+                self.__last_fold = sublime.Region(self.__last_fold.begin() - remove_region.size(),
                                                   self.__last_fold.end() - remove_region.size())
         if self.__last_fold is not None:
             foldregion = sublime.Region(self.__last_fold.begin()-1, self.__last_fold.end())
