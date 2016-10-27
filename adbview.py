@@ -204,6 +204,9 @@ class ADBView(object):
         self.__view.set_scratch(True)
         self.__view.set_read_only(True)
         self.__view.set_syntax_file("Packages/ADBView/adb.tmLanguage")
+        # "scroll_past_end" affects our auto scrolling feature, and it is default to 
+        # True on all platforms except macOS.
+        self.__view.settings().set("scroll_past_end", False)
 
         print("running: %s" % cmd)
         info = None
