@@ -3,7 +3,7 @@
     "adb_command": "adb",
 
     // ADB arguments that should be used.
-    "adb_args": ["logcat", "-v", "time"],
+    "adb_args": ["logcat", "-v", "threadtime"],
 
     // Set to false to disable auto scroll of the ADB view
     "adb_auto_scroll": true,
@@ -13,7 +13,7 @@
     "adb_snap_lines": 5,
 
     // Max number of lines in the adb logcat buffer
-    "adb_maxlines": 20000,
+    "adb_maxlines": 200000,
 
     // A regex filter that is used when selecting which lines to display
     "adb_filter": ".",

@@ -362,9 +362,9 @@ class AdbAddLine(sublime_plugin.TextCommand):
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"[\-\d\s:.]*./.+\( *(\d+)\)", data)
+        match = re.match(r"^\d+\-\d+ [\d\:\.]* +(\d+) +\d+ . ", data)
         if match != None:
-            set_filter(self.view, "\( *%s\)" % match.group(1))
+            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +%s" % match.group(1))
         else:
             sublime.error_message("Couldn't extract process id")
 
@@ -375,14 +375,14 @@ class AdbFilterByProcessId(sublime_plugin.TextCommand):
         return self.is_enabled()
 
 
-class AdbFilterByProcessName(sublime_plugin.TextCommand):
+class AdbFilterByThreadId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"[\-\d\s:.]*./(.+)\( *\d+\)", data)
+        match = re.match(r"^\d+\-\d+ [\d\:\.]* +(\d+) +(\d+) .", data)
         if match != None:
-            set_filter(self.view, "%s\( *\d+\)" % match.group(1))
+            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +%s +%s+" % (match.group(1), match.group(2)))
         else:
-            sublime.error_message("Couldn't extract process name")
+            sublime.error_message("Couldn't extract thread id")
 
     def is_enabled(self):
         return is_adb_syntax(self.view)
@@ -394,9 +394,9 @@ class AdbFilterByProcessName(sublime_plugin.TextCommand):
 class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"[\-\d\s:.]*(\w)/.+\( *\d+\)", data)
+        match = re.match(r"^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (.)", data)
         if match != None:
-            set_filter(self.view, "%s/.+\( *\d+\)" % match.group(1))
+            set_filter(self.view, "^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (%s)" % match.group(3))
         else:
             sublime.error_message("Couldn't extract Message level")
 
