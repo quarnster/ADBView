@@ -13,7 +13,7 @@
     "adb_snap_lines": 5,
 
     // Max number of lines in the adb logcat buffer
-    "adb_maxlines": 200000,
+    "adb_maxlines": 100000,
 
     // A regex filter that is used when selecting which lines to display
     "adb_filter": ".",

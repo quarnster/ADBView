@@ -374,6 +374,20 @@ class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def is_visible(self):
         return self.is_enabled()
 
+class AdbFilterByTagName(sublime_plugin.TextCommand):
+    def run(self, edit):
+        data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
+        match = re.match(r"^\d+\-\d+ [\d\:\.]* +\d+ +\d+ ([^\:]*):", data)
+        if match != None:
+            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +\d+ +\d+ %s:" % match.group(1))
+        else:
+            sublime.error_message("Couldn't extract thread id")
+
+    def is_enabled(self):
+        return is_adb_syntax(self.view)
+
+    def is_visible(self):
+        return self.is_enabled()
 
 class AdbFilterByThreadId(sublime_plugin.TextCommand):
     def run(self, edit):
