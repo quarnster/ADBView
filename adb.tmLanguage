@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
+
 <dict>
     <key>name</key>
     <string>Android Debug Bridge</string>
@@ -8,7 +9,7 @@
     <array>
         <dict>
             <key>match</key>
-            <string>^([\d\- :.]*)(F)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (F) ([^\:]*): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -19,17 +20,17 @@
                 <key>2</key>
                 <dict>
                     <key>name</key>
-                    <string>invalid.illegal.adb</string>
+                    <string>constant.other.adb</string>
                 </dict>
                 <key>3</key>
                 <dict>
                     <key>name</key>
-                    <string>entity.name.function</string>
+                    <string>invalid.illegal.adb</string>
                 </dict>
                 <key>4</key>
                 <dict>
                     <key>name</key>
-                    <string>constant.other.adb</string>
+                    <string>entity.name.function</string>
                 </dict>
                 <key>5</key>
                 <dict>
@@ -40,7 +41,7 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^([\d\- :.]*)(E)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (E) ([^\:]*): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -51,17 +52,17 @@
                 <key>2</key>
                 <dict>
                     <key>name</key>
-                    <string>invalid.illegal.adb</string>
+                    <string>constant.other.adb</string>
                 </dict>
                 <key>3</key>
                 <dict>
                     <key>name</key>
-                    <string>entity.name.function</string>
+                    <string>invalid.illegal.adb</string>
                 </dict>
                 <key>4</key>
                 <dict>
                     <key>name</key>
-                    <string>constant.other.adb</string>
+                    <string>entity.name.function</string>
                 </dict>
                 <key>5</key>
                 <dict>
@@ -72,7 +73,7 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^([\d\- :.]*)(D)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (D) ([^\:]*): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -81,19 +82,19 @@
                     <string>constant.other.adb.timestamp</string>
                 </dict>
                 <key>2</key>
+                <dict>
+                    <key>name</key>
+                    <string>constant.other.adb</string>
+                </dict>
+                <key>3</key>
                 <dict>
                     <key>name</key>
                     <string>comment.adb</string>
                 </dict>
-                <key>3</key>
-                <dict>
-                    <key>name</key>
-                    <string>entity.name.function</string>
-                </dict>
                 <key>4</key>
                 <dict>
                     <key>name</key>
-                    <string>constant.other.adb</string>
+                    <string>entity.name.function</string>
                 </dict>
                 <key>5</key>
                 <dict>
@@ -104,7 +105,7 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^([\d\- :.]*)(W)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (W) ([^\:]*): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -115,17 +116,17 @@
                 <key>2</key>
                 <dict>
                     <key>name</key>
-                    <string>keyword.adb</string>
+                    <string>constant.other.adb</string>
                 </dict>
                 <key>3</key>
                 <dict>
                     <key>name</key>
-                    <string>entity.name.function</string>
+                    <string>keyword.adb</string>
                 </dict>
                 <key>4</key>
                 <dict>
                     <key>name</key>
-                    <string>constant.other.adb</string>
+                    <string>entity.name.function</string>
                 </dict>
                 <key>5</key>
                 <dict>
@@ -136,7 +137,7 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^([\d\- :.]*)(I)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (I) ([^\:]*): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -147,17 +148,17 @@
                 <key>2</key>
                 <dict>
                     <key>name</key>
-                    <string>entity.name.filename.adb</string>
+                    <string>constant.other.adb</string>
                 </dict>
                 <key>3</key>
                 <dict>
                     <key>name</key>
-                    <string>entity.name.function</string>
+                    <string>entity.name.filename.adb</string>
                 </dict>
                 <key>4</key>
                 <dict>
                     <key>name</key>
-                    <string>constant.other.adb</string>
+                    <string>entity.name.function</string>
                 </dict>
                 <key>5</key>
                 <dict>
@@ -168,7 +169,7 @@
         </dict>
         <dict>
             <key>match</key>
-            <string>^([\d\- :.]*)(.)\/(.*)\( *(\d+)\): (.*)</string>
+            <string>^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (.) ([^\:]*): (.*)</string>
             <key>captures</key>
             <dict>
                 <key>1</key>
@@ -176,12 +177,12 @@
                     <key>name</key>
                     <string>constant.other.adb.timestamp</string>
                 </dict>
-                <key>3</key>
+                <key>4</key>
                 <dict>
                     <key>name</key>
                     <string>entity.name.function</string>
                 </dict>
-                <key>4</key>
+                <key>5</key>
                 <dict>
                     <key>name</key>
                     <string>constant.other.adb</string>
