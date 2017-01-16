@@ -381,7 +381,7 @@ class AdbFilterByTagName(sublime_plugin.TextCommand):
         if match != None:
             set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +\d+ +\d+ %s:" % match.group(1))
         else:
-            sublime.error_message("Couldn't extract thread id")
+            sublime.error_message("Couldn't extract tag name")
 
     def is_enabled(self):
         return is_adb_syntax(self.view)
