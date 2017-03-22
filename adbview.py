@@ -45,7 +45,8 @@ __adb_settings_defaults = {
     "adb_filter": ".",
     "adb_auto_scroll": True,
     "adb_launch_single": True,
-    "adb_snap_lines": 5
+    "adb_snap_lines": 5,
+    "adb_strip_filtered": False
 }
 
 def __decode_wrap(dec):
@@ -197,6 +198,7 @@ class ADBView(object):
         self.__do_scroll = get_setting("adb_auto_scroll")
         self.__manual_scroll = False
         self.__snapLines = get_setting("adb_snap_lines")
+        self.__strip_filterd_lines = get_setting("adb_strip_filtered_lines")
         self.__cmd = cmd
         self.__closing = False
         self.__view = sublime.active_window().new_file()
@@ -312,6 +314,9 @@ class ADBView(object):
         overflowed = 0
         row, _ = self.__view.rowcol(self.__view.size())
         for line in lines:
+            filtered = (self.__filter.search(line) is None)
+            if filtered and self.__strip_filterd_lines:
+                continue
             row += 1
             if row > self.__maxlines:
                 overflowed += 1
@@ -319,7 +324,7 @@ class ADBView(object):
             self.__view.insert(e, self.__view.size(), line)
             self.__view.set_read_only(True)
 
-            if self.__filter.search(line) == None:
+            if filtered:
                 region = self.__view.line(self.__view.size()-1)
                 if self.__last_fold != None:
                     self.__last_fold = self.__last_fold.cover(region)

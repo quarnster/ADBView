@@ -19,6 +19,8 @@
     "adb_filter": ".",
 
     // Whether or not to just go ahead and launch ADB if there's only one device attached
-    "adb_launch_single": true
+    "adb_launch_single": true,
 
+    // Remove filtered lines instead of folding them up
+    "adb_strip_filtered_lines": false
 }
