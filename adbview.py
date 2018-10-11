@@ -32,6 +32,11 @@ import traceback
 import telnetlib
 
 
+process_shell = False
+if os.name == 'nt':
+  process_shell = True
+
+
 ################################################################################
 #                             Utility functions                                #
 ################################################################################
@@ -46,7 +51,9 @@ __adb_settings_defaults = {
     "adb_auto_scroll": True,
     "adb_launch_single": True,
     "adb_snap_lines": 5,
-    "adb_strip_filtered": False
+    "adb_strip_filtered": False,
+    "adb_app_package": False,
+    "adb_clear_on_launch": False
 }
 
 def __decode_wrap(dec):
@@ -209,7 +216,13 @@ class ADBView(object):
         # "scroll_past_end" affects our auto scrolling feature, and it is default to 
         # True on all platforms except macOS.
         self.__view.settings().set("scroll_past_end", False)
-
+        
+        self.add_text('Loading...')
+        
+        self.app_pid = -1
+        self.update_app_pid()
+        self.clear_logcat()
+        
         print("running: %s" % cmd)
         info = None
         if os.name == 'nt':
@@ -231,7 +244,45 @@ class ADBView(object):
         except:
             traceback.print_exc()
             sublime.error_message("invalid regex")
-
+    
+    def update_app_pid(self):
+        app_package = get_setting('adb_app_package')
+        if app_package:
+            adb = get_setting("adb_command")
+            # cmd_pid = [adb, "shell", "pidof", app_package]
+            cmd_pid = [adb, "shell", "pgrep", app_package]
+            proc_pid = subprocess.Popen(cmd_pid, shell=process_shell, stdout=subprocess.PIPE)
+            app_pid, err = proc_pid.communicate()
+            
+            if not app_pid:
+                app_pid = 0
+                if self.app_pid == -1:
+                    self.add_text("PID not found for process: '%s'" % app_package)
+            else:
+                app_pid = decode(app_pid)
+                app_pid = app_pid.split('\n')[0].strip()
+            
+            if self.app_pid != app_pid:
+                self.app_pid = app_pid
+                # (time date) (pid)
+                self.__filter = re.compile(r"^(\d+\-\d+ [\d\:\.]*) +(%s)" % app_pid)
+                
+                if app_pid:
+                    self.add_text("PID for process: '%s' [%s]" % (app_package, app_pid))
+    
+    def clear_logcat(self):
+      clear_on_launch = get_setting('adb_clear_on_launch')
+      if clear_on_launch:
+          adb = get_setting("adb_command")
+          cmd_clear = [adb, "logcat", "-c"]
+          proc_clear = subprocess.Popen(cmd_clear, shell=process_shell)
+          self.add_text("Logcat Cleared")
+    
+    def add_text(self, text):
+        self.__view.set_read_only(False)
+        self.__view.run_command('insert', {"characters": text + '\n'})
+        self.__view.set_read_only(True)
+    
     @property
     def name(self):
         return self.__name
@@ -274,7 +325,7 @@ class ADBView(object):
         with self.__cond:
             self.__closing = True
             self.__cond.notify()
-
+    
     def __process_thread(self):
         while True:
             with self.__cond:
@@ -284,6 +335,8 @@ class ADBView(object):
 
             # collect more logs, for better performance
             time.sleep(0.01)
+            
+            self.update_app_pid()
 
             sublime.set_timeout(self.__check_autoscroll, 0)
 
@@ -438,7 +491,7 @@ class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
         adb = get_setting("adb_command")
         cmd = [adb, "-s", device, "jdwp"]
         try:
-            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(cmd, shell=process_shell, stdout=subprocess.PIPE)
             out,err = proc.communicate()
             out = decode(out)
         except:
@@ -516,7 +569,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         adb = get_setting("adb_command")
         cmd = [adb, "devices"]
         try:
-            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(cmd, shell=process_shell, stdout=subprocess.PIPE)
             out,err = proc.communicate()
             out = decode(out)
         except:
@@ -535,7 +588,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         for device in self.devices:
             # dump build.prop
             cmd = [adb, "-s", device, "shell", "cat /system/build.prop"]
-            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(cmd, shell=process_shell, stdout=subprocess.PIPE)
             build_prop = decode(proc.stdout.read().strip())
             # get name
             product = "Unknown"  # should never actually see this
@@ -561,7 +614,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             version = str(version).strip()
             device = str(device).strip()
             self.options.append("%s %s - %s" % (product, version, device))
-
+        
         if len(self.options) == 0:
             sublime.status_message("ADB: No device attached!")
         elif len(self.options) == 1 and len(adb_views) == 0 and get_setting("adb_launch_single"):
