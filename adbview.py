@@ -32,9 +32,17 @@ import traceback
 import telnetlib
 
 
-process_shell = False
-if os.name == 'nt':
-  process_shell = True
+process_shell = (os.name == 'nt')
+                #  (time)                    (pid)     (thread)  (level)  (tag)
+FILTER_GROUPS = [r"(^\d+\-\d+ [\d\:\.]*)", r"(\d+)", r"(\d+)", r"(\w)", r"([^\:]*:)"]
+GROUPS_SEPARATOR = ' +'
+FILTER_PATTERN = GROUPS_SEPARATOR.join(FILTER_GROUPS)
+
+TIME_GROUP   = 0
+PID_GROUP    = 1
+THREAD_GROUP = 2
+LEVEL_GROUP  = 3
+TAG_GROUP    = 4
 
 
 ################################################################################
@@ -186,6 +194,16 @@ def set_filter(view, filter):
         adb_view.set_filter(filter)
     else:
         apply_filter(view, filter)
+    
+def set_filter_by_group(view, group, value):
+    adb_view = get_adb_view(view)
+    if adb_view:
+        adb_view.set_filter_by_group(group, value)
+    else:
+        group_copy = FILTER_GROUPS.copy()
+        group_copy[group] = str(groups[group])
+        filter = GROUPS_SEPARATOR.join(group_copy)
+        apply_filter(view, filter)
 
 
 ################################################################################
@@ -199,9 +217,11 @@ class ADBView(object):
         self.__last_fold = None
         self.__timer = None
         self.__lines = []
+        self.__app_pid = -1
         self.__cond = threading.Condition()
         self.__maxlines = get_setting("adb_maxlines")
         self.__filter = re.compile(get_setting("adb_filter"))
+        self.__filter_groups = FILTER_GROUPS.copy()
         self.__do_scroll = get_setting("adb_auto_scroll")
         self.__manual_scroll = False
         self.__snapLines = get_setting("adb_snap_lines")
@@ -219,9 +239,9 @@ class ADBView(object):
         
         self.add_text('Loading...')
         
-        self.app_pid = -1
         self.update_app_pid()
-        self.clear_logcat()
+        if get_setting('adb_clear_on_launch'):
+            self.clear_logcat()
         
         print("running: %s" % cmd)
         info = None
@@ -236,10 +256,20 @@ class ADBView(object):
         if self.__adb_process != None and self.__adb_process.poll() == None:
             self.__adb_process.kill()
 
-    def set_filter(self, filter):
+    def set_filter_by_group(self, group, value, folding=True, reset_filter=True):
+        if reset_filter:
+            self.__filter_groups = FILTER_GROUPS.copy()
+        self.__filter_groups[group] = str(value)
+        if self.__app_pid != -1:
+            self.__filter_groups[PID_GROUP] = str(self.__app_pid)
+        
+        filter = GROUPS_SEPARATOR.join(self.__filter_groups)
+        self.set_filter(filter, folding)
+    
+    def set_filter(self, filter, folding=True):
         try:
             self.__filter = re.compile(filter)
-            if self.__view:
+            if folding and self.__view:
                 self.__last_fold = apply_filter(self.__view, self.__filter)
         except:
             traceback.print_exc()
@@ -256,27 +286,23 @@ class ADBView(object):
             
             if not app_pid:
                 app_pid = 0
-                if self.app_pid == -1:
+                if self.__app_pid == -1:
                     self.add_text("PID not found for process: '%s'" % app_package)
             else:
                 app_pid = decode(app_pid)
-                app_pid = app_pid.split('\n')[0].strip()
+                app_pid = int(app_pid.split('\n')[0].strip())
             
-            if self.app_pid != app_pid:
-                self.app_pid = app_pid
-                # (time date) (pid)
-                self.__filter = re.compile(r"^(\d+\-\d+ [\d\:\.]*) +(%s)" % app_pid)
-                
+            if self.__app_pid != app_pid:
+                self.__app_pid = app_pid
+                self.set_filter_by_group(PID_GROUP, app_pid, False, False)
                 if app_pid:
                     self.add_text("PID for process: '%s' [%s]" % (app_package, app_pid))
     
     def clear_logcat(self):
-      clear_on_launch = get_setting('adb_clear_on_launch')
-      if clear_on_launch:
-          adb = get_setting("adb_command")
-          cmd_clear = [adb, "logcat", "-c"]
-          proc_clear = subprocess.Popen(cmd_clear, shell=process_shell)
-          self.add_text("Logcat Cleared")
+        adb = get_setting("adb_command")
+        cmd_clear = [adb, "logcat", "-c"]
+        proc_clear = subprocess.Popen(cmd_clear, shell=process_shell)
+        self.add_text("Logcat Cleared")
     
     def add_text(self, text):
         self.__view.set_read_only(False)
@@ -337,7 +363,6 @@ class ADBView(object):
             time.sleep(0.01)
             
             self.update_app_pid()
-
             sublime.set_timeout(self.__check_autoscroll, 0)
 
             lines = None
@@ -420,9 +445,9 @@ class AdbAddLine(sublime_plugin.TextCommand):
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^\d+\-\d+ [\d\:\.]* +(\d+) +\d+ . ", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +%s" % match.group(1))
+            set_filter_by_group(self.view, PID_GROUP, match.group(PID_GROUP+1))
         else:
             sublime.error_message("Couldn't extract process id")
 
@@ -435,9 +460,9 @@ class AdbFilterByProcessId(sublime_plugin.TextCommand):
 class AdbFilterByTagName(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^\d+\-\d+ [\d\:\.]* +\d+ +\d+ ([^\:]*):", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +\d+ +\d+ %s:" % match.group(1))
+            set_filter_by_group(self.view, TAG_GROUP, match.group(TAG_GROUP+1))
         else:
             sublime.error_message("Couldn't extract tag name")
 
@@ -450,9 +475,9 @@ class AdbFilterByTagName(sublime_plugin.TextCommand):
 class AdbFilterByThreadId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^\d+\-\d+ [\d\:\.]* +(\d+) +(\d+) .", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +%s +%s+" % (match.group(1), match.group(2)))
+            set_filter_by_group(self.view, THREAD_GROUP, match.group(THREAD_GROUP+1))
         else:
             sublime.error_message("Couldn't extract thread id")
 
@@ -466,9 +491,9 @@ class AdbFilterByThreadId(sublime_plugin.TextCommand):
 class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (.)", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (%s)" % match.group(3))
+            set_filter_by_group(self.view, LEVEL_GROUP, match.group(LEVEL_GROUP+1))
         else:
             sublime.error_message("Couldn't extract Message level")
 
@@ -499,7 +524,7 @@ class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
             return
         pids = re.findall(r'\d+', out)
         if len(pids) > 0:
-            set_filter(self.view, "\( *(%s)\)" % "|".join(pids))
+            set_filter(self.view, "( *(%s))" % "|".join(pids))
         else:
             sublime.error_message("No debuggable apps")
 
