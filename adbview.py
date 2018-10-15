@@ -60,8 +60,7 @@ __adb_settings_defaults = {
     "adb_launch_single": True,
     "adb_snap_lines": 5,
     "adb_strip_filtered": False,
-    "adb_app_package": False,
-    "adb_clear_on_launch": False
+    "adb_app_package": False
 }
 
 def __decode_wrap(dec):
@@ -205,12 +204,17 @@ def set_filter_by_group(view, group, value):
         filter = GROUPS_SEPARATOR.join(group_copy)
         apply_filter(view, filter)
 
+def clear_logcat():
+    adb = get_setting("adb_command")
+    cmd_clear = [adb, "logcat", "-c"]
+    proc_clear = subprocess.Popen(cmd_clear, shell=process_shell)
+
 
 ################################################################################
 #                ADBView class dealing with ADB Logcat views                   #
 ################################################################################
 class ADBView(object):
-    def __init__(self, cmd, name="", device=""):
+    def __init__(self, cmd, name="", device="", info=""):
         self.__name = "ADB: %s" % name
         self.__device = device
         self.__view = None
@@ -218,6 +222,7 @@ class ADBView(object):
         self.__timer = None
         self.__lines = []
         self.__app_pid = -1
+        self.__app_package = get_setting('adb_app_package')
         self.__cond = threading.Condition()
         self.__maxlines = get_setting("adb_maxlines")
         self.__filter = re.compile(get_setting("adb_filter"))
@@ -237,11 +242,14 @@ class ADBView(object):
         # True on all platforms except macOS.
         self.__view.settings().set("scroll_past_end", False)
         
-        self.add_text('Loading...')
+        if self.__app_package:
+            self.add_text("Filtering log by package name '%s', disable option 'adb_app_package' to see full log" % self.__app_package)
         
+        self.add_text('Loading...')
         self.update_app_pid()
-        if get_setting('adb_clear_on_launch'):
-            self.clear_logcat()
+        
+        if info:
+            self.add_text(info)
         
         print("running: %s" % cmd)
         info = None
@@ -276,18 +284,17 @@ class ADBView(object):
             sublime.error_message("invalid regex")
     
     def update_app_pid(self):
-        app_package = get_setting('adb_app_package')
-        if app_package:
+        if self.__app_package:
             adb = get_setting("adb_command")
-            # cmd_pid = [adb, "shell", "pidof", app_package]
-            cmd_pid = [adb, "shell", "pgrep", app_package]
+            # cmd_pid = [adb, "shell", "pidof", self.__app_package]
+            cmd_pid = [adb, "shell", "pgrep", self.__app_package]
             proc_pid = subprocess.Popen(cmd_pid, shell=process_shell, stdout=subprocess.PIPE)
             app_pid, err = proc_pid.communicate()
             
             if not app_pid:
                 app_pid = 0
                 if self.__app_pid == -1:
-                    self.add_text("PID not found for process: '%s'" % app_package)
+                    self.add_text("PID not found for process: '%s'" % self.__app_package)
             else:
                 app_pid = decode(app_pid)
                 app_pid = int(app_pid.split('\n')[0].strip())
@@ -296,13 +303,7 @@ class ADBView(object):
                 self.__app_pid = app_pid
                 self.set_filter_by_group(PID_GROUP, app_pid, False, False)
                 if app_pid:
-                    self.add_text("PID for process: '%s' [%s]" % (app_package, app_pid))
-    
-    def clear_logcat(self):
-        adb = get_setting("adb_command")
-        cmd_clear = [adb, "logcat", "-c"]
-        proc_clear = subprocess.Popen(cmd_clear, shell=process_shell)
-        self.add_text("Logcat Cleared")
+                    self.add_text("PID for process: '%s' [%s]" % (self.__app_package, app_pid))
     
     def add_text(self, text):
         self.__view.set_read_only(False)
@@ -590,7 +591,12 @@ class AdbFilterByExcludingSelections(sublime_plugin.TextCommand):
 
 
 class AdbLaunch(sublime_plugin.WindowCommand):
-    def run(self):
+    def run(self, fresh_logcat=False):
+        view_info = ''
+        if fresh_logcat:
+          clear_logcat()
+          view_info = 'Logcat Cleared'
+        
         adb = get_setting("adb_command")
         cmd = [adb, "devices"]
         try:
@@ -645,12 +651,12 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         elif len(self.options) == 1 and len(adb_views) == 0 and get_setting("adb_launch_single"):
             adb = get_setting("adb_command")
             args = get_setting("adb_args")
-            self.launch([adb] + args, self.options[0], self.devices[0])
+            self.launch([adb] + args, self.options[0], self.devices[0], view_info)
         else:
             self.window.show_quick_panel(self.options, self.on_done)
 
-    def launch(self, cmd, name, device):
-        adb_views.append(ADBView(cmd, name, device))
+    def launch(self, cmd, name, device, info=""):
+        adb_views.append(ADBView(cmd, name, device, info))
 
     def on_done(self, picked):
         if picked == -1:

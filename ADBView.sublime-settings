@@ -26,7 +26,4 @@
     
     // full or partial app package name to filter log
     "adb_app_package": "",
-    
-    // clear the logcat before new adb window opens (calls 'logcat -c')
-    "adb_clear_on_launch": false
 }

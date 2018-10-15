@@ -4,6 +4,11 @@
         "command": "adb_launch"
     },
     {
+        "caption":"ADB: Launch Fresh",
+        "command": "adb_launch",
+        "args": {"fresh_logcat": true}
+    },
+    {
         "caption": "ADB: Set Regex filter",
         "command": "adb_set_filter"
     },
