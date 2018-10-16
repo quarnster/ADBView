@@ -1,7 +1,7 @@
 {
     // ADB command location.
     "adb_command": "adb",
-
+    
     // ADB arguments that should be used.
     "adb_args": ["logcat", "-v", "threadtime"],
 
@@ -22,5 +22,8 @@
     "adb_launch_single": true,
 
     // Remove filtered lines instead of folding them up
-    "adb_strip_filtered_lines": false
+    "adb_strip_filtered_lines": false,
+    
+    // full or partial app package name to filter log
+    "adb_app_package": "",
 }

@@ -32,6 +32,19 @@ import traceback
 import telnetlib
 
 
+process_shell = (os.name == 'nt')
+                #  (time)                    (pid)     (thread)  (level)  (tag)
+FILTER_GROUPS = [r"(^\d+\-\d+ [\d\:\.]*)", r"(\d+)", r"(\d+)", r"(\w)", r"([^\:]*:)"]
+GROUPS_SEPARATOR = ' +'
+FILTER_PATTERN = GROUPS_SEPARATOR.join(FILTER_GROUPS)
+
+TIME_GROUP   = 0
+PID_GROUP    = 1
+THREAD_GROUP = 2
+LEVEL_GROUP  = 3
+TAG_GROUP    = 4
+
+
 ################################################################################
 #                             Utility functions                                #
 ################################################################################
@@ -46,7 +59,8 @@ __adb_settings_defaults = {
     "adb_auto_scroll": True,
     "adb_launch_single": True,
     "adb_snap_lines": 5,
-    "adb_strip_filtered": False
+    "adb_strip_filtered": False,
+    "adb_app_package": False
 }
 
 def __decode_wrap(dec):
@@ -179,22 +193,40 @@ def set_filter(view, filter):
         adb_view.set_filter(filter)
     else:
         apply_filter(view, filter)
+    
+def set_filter_by_group(view, group, value):
+    adb_view = get_adb_view(view)
+    if adb_view:
+        adb_view.set_filter_by_group(group, value)
+    else:
+        group_copy = FILTER_GROUPS.copy()
+        group_copy[group] = str(groups[group])
+        filter = GROUPS_SEPARATOR.join(group_copy)
+        apply_filter(view, filter)
+
+def clear_logcat():
+    adb = get_setting("adb_command")
+    cmd_clear = [adb, "logcat", "-c"]
+    proc_clear = subprocess.Popen(cmd_clear, shell=process_shell)
 
 
 ################################################################################
 #                ADBView class dealing with ADB Logcat views                   #
 ################################################################################
 class ADBView(object):
-    def __init__(self, cmd, name="", device=""):
+    def __init__(self, cmd, name="", device="", info=""):
         self.__name = "ADB: %s" % name
         self.__device = device
         self.__view = None
         self.__last_fold = None
         self.__timer = None
         self.__lines = []
+        self.__app_pid = -1
+        self.__app_package = get_setting('adb_app_package')
         self.__cond = threading.Condition()
         self.__maxlines = get_setting("adb_maxlines")
         self.__filter = re.compile(get_setting("adb_filter"))
+        self.__filter_groups = FILTER_GROUPS.copy()
         self.__do_scroll = get_setting("adb_auto_scroll")
         self.__manual_scroll = False
         self.__snapLines = get_setting("adb_snap_lines")
@@ -209,7 +241,16 @@ class ADBView(object):
         # "scroll_past_end" affects our auto scrolling feature, and it is default to 
         # True on all platforms except macOS.
         self.__view.settings().set("scroll_past_end", False)
-
+        
+        if self.__app_package:
+            self.add_text("Filtering log by package name '%s', disable option 'adb_app_package' to see full log" % self.__app_package)
+        
+        self.add_text('Loading...')
+        self.update_app_pid()
+        
+        if info:
+            self.add_text(info)
+        
         print("running: %s" % cmd)
         info = None
         if os.name == 'nt':
@@ -223,15 +264,52 @@ class ADBView(object):
         if self.__adb_process != None and self.__adb_process.poll() == None:
             self.__adb_process.kill()
 
-    def set_filter(self, filter):
+    def set_filter_by_group(self, group, value, folding=True, reset_filter=True):
+        if reset_filter:
+            self.__filter_groups = FILTER_GROUPS.copy()
+        self.__filter_groups[group] = str(value)
+        if self.__app_pid != -1:
+            self.__filter_groups[PID_GROUP] = str(self.__app_pid)
+        
+        filter = GROUPS_SEPARATOR.join(self.__filter_groups)
+        self.set_filter(filter, folding)
+    
+    def set_filter(self, filter, folding=True):
         try:
             self.__filter = re.compile(filter)
-            if self.__view:
+            if folding and self.__view:
                 self.__last_fold = apply_filter(self.__view, self.__filter)
         except:
             traceback.print_exc()
             sublime.error_message("invalid regex")
-
+    
+    def update_app_pid(self):
+        if self.__app_package:
+            adb = get_setting("adb_command")
+            # cmd_pid = [adb, "shell", "pidof", self.__app_package]
+            cmd_pid = [adb, "shell", "pgrep", self.__app_package]
+            proc_pid = subprocess.Popen(cmd_pid, shell=process_shell, stdout=subprocess.PIPE)
+            app_pid, err = proc_pid.communicate()
+            
+            if not app_pid:
+                app_pid = 0
+                if self.__app_pid == -1:
+                    self.add_text("PID not found for process: '%s'" % self.__app_package)
+            else:
+                app_pid = decode(app_pid)
+                app_pid = int(app_pid.split('\n')[0].strip())
+            
+            if self.__app_pid != app_pid:
+                self.__app_pid = app_pid
+                self.set_filter_by_group(PID_GROUP, app_pid, False, False)
+                if app_pid:
+                    self.add_text("PID for process: '%s' [%s]" % (self.__app_package, app_pid))
+    
+    def add_text(self, text):
+        self.__view.set_read_only(False)
+        self.__view.run_command('insert', {"characters": text + '\n'})
+        self.__view.set_read_only(True)
+    
     @property
     def name(self):
         return self.__name
@@ -274,7 +352,7 @@ class ADBView(object):
         with self.__cond:
             self.__closing = True
             self.__cond.notify()
-
+    
     def __process_thread(self):
         while True:
             with self.__cond:
@@ -284,7 +362,8 @@ class ADBView(object):
 
             # collect more logs, for better performance
             time.sleep(0.01)
-
+            
+            self.update_app_pid()
             sublime.set_timeout(self.__check_autoscroll, 0)
 
             lines = None
@@ -367,9 +446,9 @@ class AdbAddLine(sublime_plugin.TextCommand):
 class AdbFilterByProcessId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^\d+\-\d+ [\d\:\.]* +(\d+) +\d+ . ", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +%s" % match.group(1))
+            set_filter_by_group(self.view, PID_GROUP, match.group(PID_GROUP+1))
         else:
             sublime.error_message("Couldn't extract process id")
 
@@ -382,9 +461,9 @@ class AdbFilterByProcessId(sublime_plugin.TextCommand):
 class AdbFilterByTagName(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^\d+\-\d+ [\d\:\.]* +\d+ +\d+ ([^\:]*):", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +\d+ +\d+ %s:" % match.group(1))
+            set_filter_by_group(self.view, TAG_GROUP, match.group(TAG_GROUP+1))
         else:
             sublime.error_message("Couldn't extract tag name")
 
@@ -397,9 +476,9 @@ class AdbFilterByTagName(sublime_plugin.TextCommand):
 class AdbFilterByThreadId(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^\d+\-\d+ [\d\:\.]* +(\d+) +(\d+) .", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^\d+\-\d+ [\d\:\.]* +%s +%s+" % (match.group(1), match.group(2)))
+            set_filter_by_group(self.view, THREAD_GROUP, match.group(THREAD_GROUP+1))
         else:
             sublime.error_message("Couldn't extract thread id")
 
@@ -413,9 +492,9 @@ class AdbFilterByThreadId(sublime_plugin.TextCommand):
 class AdbFilterByMessageLevel(sublime_plugin.TextCommand):
     def run(self, edit):
         data = self.view.substr(self.view.full_line(self.view.sel()[0].a))
-        match = re.match(r"^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (.)", data)
+        match = re.match(FILTER_PATTERN, data)
         if match != None:
-            set_filter(self.view, "^(\d+\-\d+ [\d\:\.]*) +(\d+ +\d+) (%s)" % match.group(3))
+            set_filter_by_group(self.view, LEVEL_GROUP, match.group(LEVEL_GROUP+1))
         else:
             sublime.error_message("Couldn't extract Message level")
 
@@ -438,7 +517,7 @@ class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
         adb = get_setting("adb_command")
         cmd = [adb, "-s", device, "jdwp"]
         try:
-            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(cmd, shell=process_shell, stdout=subprocess.PIPE)
             out,err = proc.communicate()
             out = decode(out)
         except:
@@ -446,7 +525,7 @@ class AdbFilterByDebuggableApps(sublime_plugin.TextCommand):
             return
         pids = re.findall(r'\d+', out)
         if len(pids) > 0:
-            set_filter(self.view, "\( *(%s)\)" % "|".join(pids))
+            set_filter(self.view, "( *(%s))" % "|".join(pids))
         else:
             sublime.error_message("No debuggable apps")
 
@@ -512,11 +591,16 @@ class AdbFilterByExcludingSelections(sublime_plugin.TextCommand):
 
 
 class AdbLaunch(sublime_plugin.WindowCommand):
-    def run(self):
+    def run(self, fresh_logcat=False):
+        view_info = ''
+        if fresh_logcat:
+          clear_logcat()
+          view_info = 'Logcat Cleared'
+        
         adb = get_setting("adb_command")
         cmd = [adb, "devices"]
         try:
-            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(cmd, shell=process_shell, stdout=subprocess.PIPE)
             out,err = proc.communicate()
             out = decode(out)
         except:
@@ -535,7 +619,7 @@ class AdbLaunch(sublime_plugin.WindowCommand):
         for device in self.devices:
             # dump build.prop
             cmd = [adb, "-s", device, "shell", "cat /system/build.prop"]
-            proc = subprocess.Popen(cmd, shell=False, stdout=subprocess.PIPE)
+            proc = subprocess.Popen(cmd, shell=process_shell, stdout=subprocess.PIPE)
             build_prop = decode(proc.stdout.read().strip())
             # get name
             product = "Unknown"  # should never actually see this
@@ -561,18 +645,18 @@ class AdbLaunch(sublime_plugin.WindowCommand):
             version = str(version).strip()
             device = str(device).strip()
             self.options.append("%s %s - %s" % (product, version, device))
-
+        
         if len(self.options) == 0:
             sublime.status_message("ADB: No device attached!")
         elif len(self.options) == 1 and len(adb_views) == 0 and get_setting("adb_launch_single"):
             adb = get_setting("adb_command")
             args = get_setting("adb_args")
-            self.launch([adb] + args, self.options[0], self.devices[0])
+            self.launch([adb] + args, self.options[0], self.devices[0], view_info)
         else:
             self.window.show_quick_panel(self.options, self.on_done)
 
-    def launch(self, cmd, name, device):
-        adb_views.append(ADBView(cmd, name, device))
+    def launch(self, cmd, name, device, info=""):
+        adb_views.append(ADBView(cmd, name, device, info))
 
     def on_done(self, picked):
         if picked == -1:
