@@ -287,7 +287,7 @@ class ADBView(object):
         if self.__app_package:
             adb = get_setting("adb_command")
             # cmd_pid = [adb, "shell", "pidof", self.__app_package]
-            cmd_pid = [adb, "shell", "pgrep", self.__app_package]
+            cmd_pid = [adb, "shell", "pgrep", "-f", self.__app_package]
             proc_pid = subprocess.Popen(cmd_pid, shell=process_shell, stdout=subprocess.PIPE)
             app_pid, err = proc_pid.communicate()
             
